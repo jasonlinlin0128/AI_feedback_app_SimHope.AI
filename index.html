@@ -314,18 +314,38 @@
         }
         
         // --- Form Rendering ---
+       // --- Form Rendering --- (全新版本，支援編輯 AI 問題)
         function renderForm(topic, customQuestions, sessionId) {
-            // ... (前半段的 standardQuestions 和 customQuestionsHtml 保持不變) ...
             const standardQuestions = [
                 { id: 'overall-satisfaction', text: '1. 整體而言，您對這次的分享會滿意度如何？' },
                 { id: 'content-relevance', text: '2. 分享會的內容對您的工作或學習是否有幫助？' },
                 { id: 'speaker-clarity', text: '3. 講者的表達是否清晰易懂？' },
                 { id: 'practicality', text: '4. 您認為分享會的內容在實務上應用的可能性高嗎？' }
             ];
+            
             let customQuestionsHtml = '';
             if (customQuestions && customQuestions.length > 0) {
-                 customQuestionsHtml = `<div id="ai-questions-container" class="mt-8 border-t pt-6"><h3 class="text-lg font-semibold text-gray-800 mb-4">針對本次主題</h3>${customQuestions.map((q, index) => `<div class="mb-6"><label class="block text-md font-medium text-gray-700 mb-3" data-question-text="${q.question}">${index + 5}. ${q.question}</label><div class="flex items-center space-x-4"><input type="radio" id="custom-${index}-yes" name="custom-${index}" value="是" class="h-4 w-4 text-blue-600" required><label for="custom-${index}-yes">是</label><input type="radio" id="custom-${index}-no" name="custom-${index}" value="否" class="h-4 w-4 text-blue-600"><label for="custom-${index}-no">否</label><input type="radio" id="custom-${index}-neutral" name="custom-${index}" value="無意見" class="h-4 w-4 text-blue-600"><label for="custom-${index}-neutral">無意見</label></div></div>`).join('')}</div>`;
+                 // *** 核心修改：將 label 換成 input ***
+                 const aiQuestions = customQuestions.map((q, index) => `
+                    <div class="mb-6 ai-question">
+                        <div class="flex items-center mb-3">
+                            <span class="font-semibold text-gray-800 mr-2">${index + 5}.</span>
+                            <input type="text" value="${q.question}" class="w-full px-2 py-1 border border-gray-300 rounded-lg ai-question-input">
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <input type="radio" id="custom-${index}-yes" name="custom-${index}" value="是" class="h-4 w-4 text-blue-600" required><label for="custom-${index}-yes">是</label>
+                            <input type="radio" id="custom-${index}-no" name="custom-${index}" value="否" class="h-4 w-4 text-blue-600"><label for="custom-${index}-no">否</label>
+                            <input type="radio" id="custom-${index}-neutral" name="custom-${index}" value="無意見" class="h-4 w-4 text-blue-600"><label for="custom-${index}-neutral">無意見</label>
+                        </div>
+                    </div>`).join('');
+                
+                customQuestionsHtml = `
+                    <div class="mt-8 border-t pt-6">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">針對本次主題 (可編輯)</h3>
+                        ${aiQuestions}
+                    </div>`;
             }
+
             nextQuestionNumber = standardQuestions.length + (customQuestions ? customQuestions.length : 0) + 1;
             
             formOutput.innerHTML = `<div class="text-center mb-6"><h2 class="text-2xl font-bold">${topic}</h2><p class="text-md text-gray-600 mt-1">分享會回饋表單</p></div>
@@ -335,9 +355,9 @@
                     <input type="text" id="submitter-name" name="submitter-name" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="請輸入您的姓名" required>
                 </div>
                 <div class="mb-8">
-        <label for="submitter-department" class="block text-md font-medium text-gray-700 mb-2">您的部門：</label>
-        <input type="text" id="submitter-department" name="submitter-department" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="請輸入您的部門" required>
-    </div>
+                    <label for="submitter-department" class="block text-md font-medium text-gray-700 mb-2">您的部門：</label>
+                    <input type="text" id="submitter-department" name="submitter-department" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="請輸入您的部門" required>
+                </div>
                 ${standardQuestions.map(q => `<div class="mb-8"><label class="block text-md font-medium text-gray-700 mb-3">${q.text}</label><div class="star-rating flex flex-row-reverse justify-end"><input type="radio" id="${q.id}-5" name="${q.id}" value="5" required><label for="${q.id}-5">★</label><input type="radio" id="${q.id}-4" name="${q.id}" value="4"><label for="${q.id}-4">★</label><input type="radio" id="${q.id}-3" name="${q.id}" value="3"><label for="${q.id}-3">★</label><input type="radio" id="${q.id}-2" name="${q.id}" value="2"><label for="${q.id}-2">★</label><input type="radio" id="${q.id}-1" name="${q.id}" value="1"><label for="${q.id}-1">★</label></div></div>`).join('')}
                 
                 <div id="editable-questions-container">${customQuestionsHtml}</div>
@@ -348,31 +368,29 @@
                 </div>
 
                 <div id="form-editor-controls" class="mt-8 border-t pt-6 text-sm">
-    <h3 class="font-semibold mb-2">編輯表單</h3>
-    <div class="flex flex-wrap gap-2">
-        <button type="button" id="add-star-btn" class="px-3 py-1 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">新增星星評分</button>
-        <button type="button" id="add-yesno-btn" class="px-3 py-1 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">新增是非題</button>
-        <button type="button" id="add-text-btn" class="px-3 py-1 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">新增簡答題</button>
-    </div>
-    <div class="mt-4">
-        <button type="button" id="publish-btn" class="w-full px-4 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700">
-            發布並產生 QR Code
-        </button>
-    </div>
-</div>
+                    <h3 class="font-semibold mb-2">編輯表單</h3>
+                    <div class="flex flex-wrap gap-2">
+                        <button type="button" id="add-star-btn" class="px-3 py-1 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">新增星星評分</button>
+                        <button type="button" id="add-yesno-btn" class="px-3 py-1 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">新增是非題</button>
+                        <button type="button" id="add-text-btn" class="px-3 py-1 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">新增簡答題</button>
+                    </div>
+                    <div class="mt-4">
+                        <button type="button" id="publish-btn" class="w-full px-4 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700">
+                            發布並產生 QR Code
+                        </button>
+                    </div>
+                </div>
                 <div class="mt-8 text-center">
                     <button type="submit" class="w-full sm:w-auto px-10 py-3 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700">提交回饋</button>
                 </div>
             </form>`;
 
-            // 為新按鈕綁定事件
             document.getElementById('feedback-form').addEventListener('submit', handleFormSubmit);
             document.getElementById('add-star-btn').addEventListener('click', () => addQuestion('star'));
             document.getElementById('add-yesno-btn').addEventListener('click', () => addQuestion('yesno'));
             document.getElementById('add-text-btn').addEventListener('click', () => addQuestion('text'));
             document.getElementById('publish-btn').addEventListener('click', handlePublishForm);
         }
-        let manualQuestionCounter = 0;
 function addQuestion(type) {
             const container = document.getElementById('editable-questions-container');
             const questionId = `manual-${type}-${manualQuestionCounter++}`;
@@ -427,6 +445,7 @@ function addQuestion(type) {
         }
 // --- Data Handling (Firebase) ---
         // --- Data Handling (Firebase) --- (全新版本)
+        // --- Data Handling (Firebase) --- (支援編輯 AI 問題的版本)
         async function handleFormSubmit(e) {
             e.preventDefault();
             if (!db) {
@@ -437,11 +456,9 @@ function addQuestion(type) {
             const formData = new FormData(form);
             
             const responses = [];
-            // 手動收集所有欄位的問與答
             responses.push({ question: "您的姓名：", answer: formData.get('submitter-name') });
             responses.push({ question: "您的部門：", answer: formData.get('submitter-department') });
 
-            // 收集標準問題
             form.querySelectorAll('.star-rating').forEach(div => {
                 const label = div.previousElementSibling;
                 const question = label.textContent;
@@ -449,12 +466,18 @@ function addQuestion(type) {
                 responses.push({ question, answer: answer ? `${answer} 星` : '' });
             });
 
-            // 收集 AI 和手動問題
-             form.querySelectorAll('#editable-questions-container .mb-6, #editable-questions-container .mb-8').forEach(div => {
-                const questionInput = div.querySelector('.manual-question-input');
-                let question = questionInput ? questionInput.value : div.querySelector('label').dataset.questionText;
+            // *** 核心修改：從 .ai-question-input 和 .manual-question-input 讀取問題文字 ***
+            // 收集 AI 問題
+            form.querySelectorAll('.ai-question').forEach((div, index) => {
+                const question = div.querySelector('.ai-question-input').value;
+                const answer = formData.get(`custom-${index}`);
+                if (question) responses.push({ question, answer });
+            });
 
-                const questionType = div.dataset.type || 'yesno';
+            // 收集手動問題
+            form.querySelectorAll('.manual-question').forEach(div => {
+                const question = div.querySelector('.manual-question-input').value;
+                const questionType = div.dataset.type;
                 const inputs = div.querySelectorAll('input[type="radio"], textarea');
                 let answer = '';
                 if (questionType === 'text') {
@@ -466,14 +489,13 @@ function addQuestion(type) {
                 if (question) responses.push({ question, answer });
             });
 
-            // 收集其他建議
             responses.push({ question: "其他建議或回饋：", answer: formData.get('feedback-comments') });
 
             const data = {
                 sessionId: form.dataset.sessionId,
                 sessionTopic: form.dataset.sessionTopic,
                 submittedAt: serverTimestamp(),
-                responses: responses // 使用統一的 responses 陣列
+                responses: responses
             };
 
             try {
@@ -488,7 +510,7 @@ function addQuestion(type) {
             }
         }
 
-        // --- 發布表單並產生 QR Code ---
+        // --- 發布表單並產生 QR Code --- (支援編輯 AI 問題的版本)
         async function handlePublishForm() {
             if (!db) {
                 showModal('錯誤', '資料庫未連接，無法發布。', true);
@@ -498,27 +520,29 @@ function addQuestion(type) {
             const form = document.getElementById('feedback-form');
             const topic = form.dataset.sessionTopic;
 
-            // 收集所有問題的結構
             const questions = [];
-            // 姓名
             questions.push({ type: 'name', text: '您的姓名：', required: true });
-            // 標準問題
+            questions.push({ type: 'name', text: '您的部門：', required: true }); // 也把部門加進來
+
             form.querySelectorAll('.star-rating').forEach(div => {
                 const label = div.previousElementSibling;
-                questions.push({ type: 'star', text: label.textContent, id: div.querySelector('input').name });
+                questions.push({ type: 'star', text: label.textContent });
             });
-            // AI 和手動問題
-            document.querySelectorAll('#editable-questions-container .mb-6, #editable-questions-container .mb-8').forEach(div => {
-                const type = div.dataset.type || 'yesno'; // AI 問題沒有 data-type，預設為 yesno
-                const textInput = div.querySelector('.manual-question-input');
-                let text = textInput ? textInput.value : div.querySelector('label').textContent;
-                
-                // 清理題號
-                text = text.replace(/^\d+\.\s*/, '');
-                
+            
+            // *** 核心修改：從 input.value 讀取問題文字 ***
+            // 收集 AI 問題
+            document.querySelectorAll('.ai-question').forEach(div => {
+                const text = div.querySelector('.ai-question-input').value;
+                questions.push({ type: 'yesno', text: text });
+            });
+
+            // 收集手動問題
+            document.querySelectorAll('.manual-question').forEach(div => {
+                const type = div.dataset.type;
+                const text = div.querySelector('.manual-question-input').value;
                 questions.push({ type: type, text: text });
             });
-            // 其他建議
+
             questions.push({ type: 'textarea', text: '其他建議或回饋：' });
 
             const formStructure = {
@@ -528,16 +552,10 @@ function addQuestion(type) {
             };
 
             try {
-                // 將表單結構存到 Firestore
                 const docRef = await addDoc(collection(db, "publishedForms"), formStructure);
                 const formId = docRef.id;
-
-                // 產生專屬連結
                 const url = `${window.location.origin}${window.location.pathname}?formId=${formId}`;
-                
-                // 顯示 QR Code 和連結
                 showQrCodeModal(url);
-
             } catch (error) {
                 console.error("Error publishing form: ", error);
                 showModal('發布失敗', '無法將表單儲存至資料庫。', true);
