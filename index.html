@@ -305,6 +305,7 @@
         
         // --- Form Rendering ---
         function renderForm(topic, customQuestions, sessionId) {
+            // ... (前半段的 standardQuestions 和 customQuestionsHtml 保持不變) ...
             const standardQuestions = [
                 { id: 'overall-satisfaction', text: '1. 整體而言，您對這次的分享會滿意度如何？' },
                 { id: 'content-relevance', text: '2. 分享會的內容對您的工作或學習是否有幫助？' },
@@ -313,8 +314,9 @@
             ];
             let customQuestionsHtml = '';
             if (customQuestions && customQuestions.length > 0) {
-                 customQuestionsHtml = `<div class="mt-8 border-t pt-6"><h3 class="text-lg font-semibold text-gray-800 mb-4">針對本次主題</h3>${customQuestions.map((q, index) => `<div class="mb-6"><label class="block text-md font-medium text-gray-700 mb-3" data-question-text="${q.question}">${index + 5}. ${q.question}</label><div class="flex items-center space-x-4"><input type="radio" id="custom-${index}-yes" name="custom-${index}" value="是" class="h-4 w-4 text-blue-600" required><label for="custom-${index}-yes">是</label><input type="radio" id="custom-${index}-no" name="custom-${index}" value="否" class="h-4 w-4 text-blue-600"><label for="custom-${index}-no">否</label><input type="radio" id="custom-${index}-neutral" name="custom-${index}" value="無意見" class="h-4 w-4 text-blue-600"><label for="custom-${index}-neutral">無意見</label></div></div>`).join('')}</div>`;
+                 customQuestionsHtml = `<div id="ai-questions-container" class="mt-8 border-t pt-6"><h3 class="text-lg font-semibold text-gray-800 mb-4">針對本次主題</h3>${customQuestions.map((q, index) => `<div class="mb-6"><label class="block text-md font-medium text-gray-700 mb-3" data-question-text="${q.question}">${index + 5}. ${q.question}</label><div class="flex items-center space-x-4"><input type="radio" id="custom-${index}-yes" name="custom-${index}" value="是" class="h-4 w-4 text-blue-600" required><label for="custom-${index}-yes">是</label><input type="radio" id="custom-${index}-no" name="custom-${index}" value="否" class="h-4 w-4 text-blue-600"><label for="custom-${index}-no">否</label><input type="radio" id="custom-${index}-neutral" name="custom-${index}" value="無意見" class="h-4 w-4 text-blue-600"><label for="custom-${index}-neutral">無意見</label></div></div>`).join('')}</div>`;
             }
+
             formOutput.innerHTML = `<div class="text-center mb-6"><h2 class="text-2xl font-bold">${topic}</h2><p class="text-md text-gray-600 mt-1">分享會回饋表單</p></div>
             <form id="feedback-form" data-session-id="${sessionId}" data-session-topic="${topic}">
                 <div class="mb-8">
@@ -322,10 +324,74 @@
                     <input type="text" id="submitter-name" name="submitter-name" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="請輸入您的姓名" required>
                 </div>
                 ${standardQuestions.map(q => `<div class="mb-8"><label class="block text-md font-medium text-gray-700 mb-3">${q.text}</label><div class="star-rating flex flex-row-reverse justify-end"><input type="radio" id="${q.id}-5" name="${q.id}" value="5" required><label for="${q.id}-5">★</label><input type="radio" id="${q.id}-4" name="${q.id}" value="4"><label for="${q.id}-4">★</label><input type="radio" id="${q.id}-3" name="${q.id}" value="3"><label for="${q.id}-3">★</label><input type="radio" id="${q.id}-2" name="${q.id}" value="2"><label for="${q.id}-2">★</label><input type="radio" id="${q.id}-1" name="${q.id}" value="1"><label for="${q.id}-1">★</label></div></div>`).join('')}
-                ${customQuestionsHtml}
-                <div class="mt-8 border-t pt-6"><label for="feedback-comments" class="block text-md font-medium text-gray-700 mb-2">其他建議或回饋：</label><textarea id="feedback-comments" name="feedback-comments" rows="5" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="任何您想讓我們知道的建議..."></textarea></div><div class="mt-8 text-center"><button type="submit" class="w-full sm:w-auto px-10 py-3 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700">提交回饋</button></div>
+                
+                <div id="editable-questions-container">${customQuestionsHtml}</div>
+
+                <div class="mt-8 border-t pt-6">
+                    <label for="feedback-comments" class="block text-md font-medium text-gray-700 mb-2">其他建議或回饋：</label>
+                    <textarea id="feedback-comments" name="feedback-comments" rows="5" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="任何您想讓我們知道的建議..."></textarea>
+                </div>
+
+                <div id="form-editor-controls" class="mt-8 border-t pt-6 text-sm">
+                    <h3 class="font-semibold mb-2">編輯表單</h3>
+                    <div class="flex flex-wrap gap-2">
+                        <button type="button" id="add-star-btn" class="px-3 py-1 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">新增星星評分</button>
+                        <button type="button" id="add-yesno-btn" class="px-3 py-1 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">新增是非題</button>
+                        <button type="button" id="add-text-btn" class="px-3 py-1 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">新增簡答題</button>
+                    </div>
+                </div>
+
+                <div class="mt-8 text-center">
+                    <button type="submit" class="w-full sm:w-auto px-10 py-3 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700">提交回饋</button>
+                </div>
             </form>`;
+
+            // 為新按鈕綁定事件
             document.getElementById('feedback-form').addEventListener('submit', handleFormSubmit);
+            document.getElementById('add-star-btn').addEventListener('click', () => addQuestion('star'));
+            document.getElementById('add-yesno-btn').addEventListener('click', () => addQuestion('yesno'));
+            document.getElementById('add-text-btn').addEventListener('click', () => addQuestion('text'));
+        }
+        let manualQuestionCounter = 0;
+        function addQuestion(type) {
+            const container = document.getElementById('editable-questions-container');
+            const questionId = `manual-${type}-${manualQuestionCounter++}`;
+            let questionHtml = '';
+
+            switch (type) {
+                case 'star':
+                    questionHtml = `
+                        <div class="mb-8 manual-question" data-type="star">
+                            <input type="text" placeholder="請在此輸入您的評分問題..." class="w-full px-2 py-1 border border-gray-300 rounded-lg mb-3 manual-question-input" required>
+                            <div class="star-rating flex flex-row-reverse justify-end">
+                                <input type="radio" id="${questionId}-5" name="${questionId}" value="5" required><label for="${questionId}-5">★</label>
+                                <input type="radio" id="${questionId}-4" name="${questionId}" value="4"><label for="${questionId}-4">★</label>
+                                <input type="radio" id="${questionId}-3" name="${questionId}" value="3"><label for="${questionId}-3">★</label>
+                                <input type="radio" id="${questionId}-2" name="${questionId}" value="2"><label for="${questionId}-2">★</label>
+                                <input type="radio" id="${questionId}-1" name="${questionId}" value="1"><label for="${questionId}-1">★</label>
+                            </div>
+                        </div>`;
+                    break;
+                case 'yesno':
+                    questionHtml = `
+                        <div class="mb-6 manual-question" data-type="yesno">
+                            <input type="text" placeholder="請在此輸入您的是非問題..." class="w-full px-2 py-1 border border-gray-300 rounded-lg mb-3 manual-question-input" required>
+                            <div class="flex items-center space-x-4">
+                                <input type="radio" id="${questionId}-yes" name="${questionId}" value="是" class="h-4 w-4 text-blue-600" required><label for="${questionId}-yes">是</label>
+                                <input type="radio" id="${questionId}-no" name="${questionId}" value="否" class="h-4 w-4 text-blue-600"><label for="${questionId}-no">否</label>
+                                <input type="radio" id="${questionId}-neutral" name="${questionId}" value="無意見" class="h-4 w-4 text-blue-600"><label for="${questionId}-neutral">無意見</label>
+                            </div>
+                        </div>`;
+                    break;
+                case 'text':
+                    questionHtml = `
+                        <div class="mb-8 manual-question" data-type="text">
+                            <input type="text" placeholder="請在此輸入您的簡答問題..." class="w-full px-2 py-1 border border-gray-300 rounded-lg mb-2 manual-question-input" required>
+                            <textarea name="${questionId}" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="回答..."></textarea>
+                        </div>`;
+                    break;
+            }
+            container.insertAdjacentHTML('beforeend', questionHtml);
         }
 // --- Data Handling (Firebase) ---
         async function handleFormSubmit(e) {
@@ -340,23 +406,48 @@
                 sessionId: form.dataset.sessionId,
                 sessionTopic: form.dataset.sessionTopic,
                 submittedAt: serverTimestamp(),
-                submitterName: formData.get('submitter-name'), // 取得姓名
+                submitterName: formData.get('submitter-name'),
                 ratings: {},
                 customResponses: [],
+                manualResponses: [], // 新增一個陣列來儲存手動新增的問題
                 comments: formData.get('feedback-comments')
             };
+
+            // 處理標準問題
             ['overall-satisfaction', 'content-relevance', 'speaker-clarity', 'practicality'].forEach(id => {
                 data.ratings[id] = parseInt(formData.get(id), 10);
             });
+
+            // 處理 AI 生成的是非題
             form.querySelectorAll('[data-question-text]').forEach((label, index) => {
                 const question = label.dataset.questionText;
                 const answer = formData.get(`custom-${index}`);
                 if (question && answer) data.customResponses.push({ question, answer });
             });
+            
+            // 處理手動新增的問題
+            form.querySelectorAll('.manual-question').forEach(questionDiv => {
+                const question = questionDiv.querySelector('.manual-question-input').value;
+                const questionType = questionDiv.dataset.type;
+                const inputs = questionDiv.querySelectorAll('input[type="radio"], textarea');
+                let answer = '';
+                if (questionType === 'text') {
+                    answer = inputs[0].value;
+                } else { // star or yesno
+                    const checkedRadio = Array.from(inputs).find(radio => radio.checked);
+                    answer = checkedRadio ? checkedRadio.value : '';
+                }
+                if (question) data.manualResponses.push({ question, answer, type: questionType });
+            });
+
+
             try {
                 await addDoc(collection(db, `artifacts/${appId}/public/data/feedbackSubmissions`), data);
                 showModal('提交成功！', '感謝您的寶貴回饋。');
                 form.reset();
+                formOutput.innerHTML = ''; // 清空表單
+                formOutput.classList.add('hidden');
+
             } catch (error) {
                 console.error("Error adding document: ", error);
                 showModal('提交失敗', '無法將您的回饋儲存至資料庫，請稍後再試。', true);
