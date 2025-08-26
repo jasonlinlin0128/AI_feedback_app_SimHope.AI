@@ -24,64 +24,80 @@
             width: 24px; height: 24px; animation: spin 1s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        /* Toggle Switch */
-        .toggle-checkbox:checked { right: 0; border-color: #4f46e5; }
-        .toggle-checkbox:checked + .toggle-label { background-color: #4f46e5; }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800">
     <!-- Main Container -->
     <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-5xl">
         
-        <!-- View Toggle -->
-        <div class="flex justify-center mb-6">
-            <button id="toggle-view-btn" class="px-4 py-2 bg-white border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                切換到數據後台
-            </button>
-        </div>
-
-        <!-- Generator View -->
-        <div id="generator-view">
-            <header class="text-center mb-8">
-                <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI 分享會回饋表單生成器</h1>
-                <p class="mt-2 text-md text-gray-600">輸入分享會資訊，或上傳簡報檔，快速生成專業的回饋表單。</p>
-            </header>
-
-            <div class="bg-white p-6 rounded-2xl shadow-lg mb-8">
-                <div class="grid grid-cols-1 gap-6">
-                    <div>
-                        <label for="session-topic" class="block text-sm font-medium text-gray-700 mb-1">分享會主題</label>
-                        <input type="text" id="session-topic" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="例如：生成式 AI 在製造業的應用">
-                    </div>
-                    <div>
-                        <label for="session-summary" class="block text-sm font-medium text-gray-700 mb-1">分享會內容摘要</label>
-                        <textarea id="session-summary" rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="簡要說明分享會涵蓋的重點..."></textarea>
-                    </div>
-                    <div>
-                        <label for="file-upload" class="block text-sm font-medium text-gray-700 mb-1">上傳參考檔案 (選填)</label>
-                        <input type="file" id="file-upload" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" accept=".docx,.pdf,.pptx">
-                        <p class="mt-1 text-xs text-gray-500">支援 .docx 檔案。PDF 和 PPTX 支援開發中。</p>
-                    </div>
+        <!-- Login View -->
+        <div id="login-view">
+            <div class="bg-white p-8 rounded-2xl shadow-lg max-w-md mx-auto text-center">
+                <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">歡迎使用</h1>
+                <p class="mt-2 text-md text-gray-600">請選擇您的身分</p>
+                <div class="mt-8 space-y-4">
+                    <button id="attendee-btn" class="w-full px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition">我是與會者</button>
+                    <button id="manager-btn" class="w-full px-6 py-3 bg-gray-700 text-white font-semibold rounded-lg shadow-md hover:bg-gray-800 transition">我是管理者</button>
                 </div>
-                <div class="mt-6 text-center">
-                    <button id="generate-btn" class="w-full sm:w-auto inline-flex items-center justify-center px-8 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-transform transform hover:scale-105">
-                        <span id="btn-text">生成回饋表單</span>
-                        <div id="loader" class="loader hidden ml-3"></div>
-                    </button>
+                <div id="password-section" class="hidden mt-6">
+                    <label for="password-input" class="block text-sm font-medium text-gray-700 mb-1">請輸入管理者密碼</label>
+                    <input type="password" id="password-input" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                    <button id="login-submit-btn" class="w-full mt-4 px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 transition">登入</button>
                 </div>
             </div>
-            <div id="form-output" class="bg-white p-6 rounded-2xl shadow-lg hidden"></div>
         </div>
 
-        <!-- Admin View -->
-        <div id="admin-view" class="hidden">
-            <header class="text-center mb-8">
-                <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">回饋數據後台</h1>
-                <p class="mt-2 text-md text-gray-600">查看所有分享會的回饋統計與詳細資料。</p>
-            </header>
-            <div id="stats-container" class="space-y-8">
-                <!-- Stats will be rendered here -->
-                <p class="text-center text-gray-500">正在載入數據...</p>
+        <!-- Main App View (Initially Hidden) -->
+        <div id="app-view" class="hidden">
+            <!-- View Toggle -->
+            <div id="toggle-view-container" class="flex justify-center mb-6 hidden">
+                <button id="toggle-view-btn" class="px-4 py-2 bg-white border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    切換到數據後台
+                </button>
+            </div>
+
+            <!-- Generator View -->
+            <div id="generator-view">
+                <header class="text-center mb-8">
+                    <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">AI 分享會回饋表單生成器</h1>
+                    <p class="mt-2 text-md text-gray-600">輸入分享會資訊，或上傳簡報檔，快速生成專業的回饋表單。</p>
+                </header>
+
+                <div class="bg-white p-6 rounded-2xl shadow-lg mb-8">
+                    <div class="grid grid-cols-1 gap-6">
+                        <div>
+                            <label for="session-topic" class="block text-sm font-medium text-gray-700 mb-1">分享會主題</label>
+                            <input type="text" id="session-topic" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="例如：生成式 AI 在製造業的應用">
+                        </div>
+                        <div>
+                            <label for="session-summary" class="block text-sm font-medium text-gray-700 mb-1">分享會內容摘要</label>
+                            <textarea id="session-summary" rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="簡要說明分享會涵蓋的重點..."></textarea>
+                        </div>
+                        <div>
+                            <label for="file-upload" class="block text-sm font-medium text-gray-700 mb-1">上傳參考檔案 (選填)</label>
+                            <input type="file" id="file-upload" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" accept=".docx,.pdf,.pptx">
+                            <p class="mt-1 text-xs text-gray-500">支援 .docx 檔案。PDF 和 PPTX 支援開發中。</p>
+                        </div>
+                    </div>
+                    <div class="mt-6 text-center">
+                        <button id="generate-btn" class="w-full sm:w-auto inline-flex items-center justify-center px-8 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-transform transform hover:scale-105">
+                            <span id="btn-text">生成回饋表單</span>
+                            <div id="loader" class="loader hidden ml-3"></div>
+                        </button>
+                    </div>
+                </div>
+                <div id="form-output" class="bg-white p-6 rounded-2xl shadow-lg hidden"></div>
+            </div>
+
+            <!-- Admin View -->
+            <div id="admin-view" class="hidden">
+                <header class="text-center mb-8">
+                    <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">回饋數據後台</h1>
+                    <p class="mt-2 text-md text-gray-600">查看所有分享會的回饋統計與詳細資料。</p>
+                </header>
+                <div id="stats-container" class="space-y-8">
+                    <p class="text-center text-gray-500">正在載入數據...</p>
+                </div>
             </div>
         </div>
 
@@ -93,7 +109,7 @@
                     <h3 class="text-lg leading-6 font-medium text-gray-900 mt-2" id="modal-title"></h3>
                     <p class="text-sm text-gray-500 mt-2 px-7 py-3" id="modal-message"></p>
                     <div class="items-center px-4 py-3">
-                        <button id="close-modal-btn" class="px-4 py-2 bg-blue-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">關閉</button>
+                        <button id="close-modal-btn" class="px-4 py-2 bg-blue-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-700">關閉</button>
                     </div>
                 </div>
             </div>
@@ -104,9 +120,11 @@
         // Firebase Imports
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- Global Variables & Config ---
+        // --- IMPORTANT: Firebase Config ---
+        // 請將此處的範例設定替換成您自己 Firebase 專案的實際設定。
+        // 這個範例是無效的，無法直接運作。
         const firebaseConfig = {
   apiKey: "AIzaSyCbRwvK7guh61K9kp2QqTrEOE7nuEXIzPg",
   authDomain: "ai-feedback-app-simhope-ai.firebaseapp.com",
@@ -116,12 +134,36 @@
   appId: "1:415250131591:web:4ca7f131bc0340f1fbe622",
   measurementId: "G-TQYH2D77YG"
 };
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        
+        // --- IMPORTANT: Firestore Security Rules ---
+        // 要修正提交失敗的問題，請到您的 Firebase 專案 -> Firestore Database -> Rules
+        // 並用以下規則取代預設規則:
+        /*
+        rules_version = '2';
+        service cloud.firestore {
+          match /databases/{database}/documents {
+            match /artifacts/{appId}/public/feedbackSubmissions/{submissionId} {
+              allow read, create: if true;
+            }
+          }
+        }
+        */
+
+        const appId = 'default-app-id'; // You can customize this if needed
         let db, auth, userId;
 
         // --- DOM Elements ---
+        const loginView = document.getElementById('login-view');
+        const appView = document.getElementById('app-view');
+        const attendeeBtn = document.getElementById('attendee-btn');
+        const managerBtn = document.getElementById('manager-btn');
+        const passwordSection = document.getElementById('password-section');
+        const passwordInput = document.getElementById('password-input');
+        const loginSubmitBtn = document.getElementById('login-submit-btn');
+        
         const generatorView = document.getElementById('generator-view');
         const adminView = document.getElementById('admin-view');
+        const toggleViewContainer = document.getElementById('toggle-view-container');
         const toggleViewBtn = document.getElementById('toggle-view-btn');
         const generateBtn = document.getElementById('generate-btn');
         const btnText = document.getElementById('btn-text');
@@ -139,37 +181,68 @@
 
         // --- Firebase Initialization ---
         async function initializeFirebase() {
+            // **FIX**: Validate if the config is still the placeholder before initializing
+            if (!firebaseConfig || firebaseConfig.apiKey === "AIzaSyxxxxxxxxxxxxxxxxxxxxxxx") {
+                showModal('設定錯誤', '您尚未設定有效的 Firebase 設定。請將程式碼中的 `firebaseConfig` 物件替換成您從 Firebase 專案中取得的實際設定。', true);
+                return; // Stop initialization if config is invalid
+            }
+
             try {
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
-
-                onAuthStateChanged(auth, async (user) => {
+                onAuthStateChanged(auth, (user) => {
                     if (user) {
                         userId = user.uid;
                     } else {
-                        // If no user, try custom token or sign in anonymously
-                        try {
-                            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                                await signInWithCustomToken(auth, __initial_auth_token);
+                        signInAnonymously(auth).catch((error) => {
+                            console.error("Anonymous sign-in failed:", error);
+                            // **FIX**: Provide a specific user-friendly error for invalid API keys
+                            if (error.code === 'auth/api-key-not-valid') {
+                                showModal('Firebase 連線錯誤', '您提供的 Firebase API 金鑰無效。請確認您已將正確的 `firebaseConfig` 貼入程式碼中。', true);
                             } else {
-                                await signInAnonymously(auth);
+                                showModal('認證失敗', `無法登入，錯誤：${error.message}`, true);
                             }
-                            userId = auth.currentUser.uid;
-                        } catch (error) {
-                            console.error("Authentication failed:", error);
-                            userId = `anon_${crypto.randomUUID()}`;
-                        }
+                        });
                     }
                 });
             } catch (error) {
                 console.error("Firebase initialization failed:", error);
-                showModal('錯誤', '無法連接到資料庫，功能將受限。', true);
+                // This catch might handle malformed config objects
+                showModal('Firebase 初始化失敗', '請檢查您的 firebaseConfig 物件格式是否正確。', true);
             }
         }
 
+        // --- Login Logic ---
+        function showAppView(isManager = false) {
+            loginView.classList.add('hidden');
+            appView.classList.remove('hidden');
+            if (isManager) {
+                toggleViewContainer.classList.remove('hidden');
+            }
+        }
+
+        attendeeBtn.addEventListener('click', () => {
+            showAppView(false);
+        });
+
+        managerBtn.addEventListener('click', () => {
+            passwordSection.classList.remove('hidden');
+        });
+
+        loginSubmitBtn.addEventListener('click', () => {
+            // IMPORTANT: This is a simple, insecure password check for demonstration.
+            // For a real application, use Firebase Authentication.
+            if (passwordInput.value === 'admin123') {
+                showAppView(true);
+            } else {
+                showModal('登入失敗', '密碼錯誤，請重試。', true);
+                passwordInput.value = '';
+            }
+        });
+
         // --- Event Listeners ---
-        toggleViewBtn.addEventListener('click', toggleView);
+        toggleViewBtn.addEventListener('click', toggleAdminView);
         generateBtn.addEventListener('click', handleGenerateForm);
         closeModalBtn.addEventListener('click', () => {
              messageModal.classList.add('hidden');
@@ -177,7 +250,7 @@
         });
 
         // --- View Management ---
-        function toggleView() {
+        function toggleAdminView() {
             if (generatorView.classList.contains('hidden')) {
                 generatorView.classList.remove('hidden');
                 adminView.classList.add('hidden');
@@ -194,7 +267,6 @@
         async function getFileContent() {
             const file = fileUpload.files[0];
             if (!file) return "";
-
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.onload = async (event) => {
@@ -203,13 +275,9 @@
                             const result = await mammoth.extractRawText({ arrayBuffer: event.target.result });
                             resolve(result.value);
                         } else {
-                            // Placeholder for other file types
-                            console.warn(`${file.type} is not fully supported yet.`);
-                            resolve("（無法預覽檔案內容）");
+                            resolve("（此檔案格式暫不支援預覽）");
                         }
-                    } catch (err) {
-                        reject(err);
-                    }
+                    } catch (err) { reject(err); }
                 };
                 reader.onerror = (error) => reject(error);
                 reader.readAsArrayBuffer(file);
@@ -220,29 +288,22 @@
         async function handleGenerateForm() {
             const topic = sessionTopicInput.value.trim();
             const summary = sessionSummaryInput.value.trim();
-            
             if (!topic || !summary) {
                 showModal('資料不完整', '請輸入分享會的主題和內容摘要。', true);
                 return;
             }
-
             setLoading(true);
             let fileContent = "";
             try {
-                if (fileUpload.files.length > 0) {
-                    fileContent = await getFileContent();
-                }
-
+                if (fileUpload.files.length > 0) fileContent = await getFileContent();
                 const customQuestions = await getCustomQuestions(topic, summary, fileContent);
                 const sessionId = crypto.randomUUID();
                 renderForm(topic, customQuestions, sessionId);
                 formOutput.classList.remove('hidden');
-
             } catch (error) {
                 console.error('Error generating form:', error);
-                showModal('生成失敗', '無法從 AI 獲取建議問題，將僅使用標準問題。', true);
-                const sessionId = crypto.randomUUID();
-                renderForm(topic, [], sessionId); // Fallback to standard questions
+                showModal('生成失敗', 'AI 無法生成問題，將僅使用標準問題。', true);
+                renderForm(topic, [], crypto.randomUUID());
                 formOutput.classList.remove('hidden');
             } finally {
                 setLoading(false);
@@ -251,61 +312,17 @@
         
         // --- Form Rendering ---
         function renderForm(topic, customQuestions, sessionId) {
-            // ... (renderForm function is large, keeping it concise for overview)
-            // This function dynamically creates the HTML for the feedback form
-            // and attaches a submit event listener.
             const standardQuestions = [
                 { id: 'overall-satisfaction', text: '1. 整體而言，您對這次的分享會滿意度如何？' },
                 { id: 'content-relevance', text: '2. 分享會的內容對您的工作或學習是否有幫助？' },
                 { id: 'speaker-clarity', text: '3. 講者的表達是否清晰易懂？' },
                 { id: 'practicality', text: '4. 您認為分享會的內容在實務上應用的可能性高嗎？' }
             ];
-
             let customQuestionsHtml = '';
             if (customQuestions && customQuestions.length > 0) {
-                 customQuestionsHtml = `
-                    <div class="mt-8 border-t pt-6">
-                        <h3 class="text-lg font-semibold text-gray-800 mb-4">針對本次主題</h3>
-                        ${customQuestions.map((q, index) => `
-                            <div class="mb-6">
-                                <label class="block text-md font-medium text-gray-700 mb-3" data-question-text="${q.question}">${index + 5}. ${q.question}</label>
-                                <div class="flex items-center space-x-4">
-                                    <input type="radio" id="custom-${index}-yes" name="custom-${index}" value="是" class="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500" required><label for="custom-${index}-yes">是</label>
-                                    <input type="radio" id="custom-${index}-no" name="custom-${index}" value="否" class="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"><label for="custom-${index}-no">否</label>
-                                    <input type="radio" id="custom-${index}-neutral" name="custom-${index}" value="無意見" class="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"><label for="custom-${index}-neutral">無意見</label>
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                `;
+                 customQuestionsHtml = `<div class="mt-8 border-t pt-6"><h3 class="text-lg font-semibold text-gray-800 mb-4">針對本次主題</h3>${customQuestions.map((q, index) => `<div class="mb-6"><label class="block text-md font-medium text-gray-700 mb-3" data-question-text="${q.question}">${index + 5}. ${q.question}</label><div class="flex items-center space-x-4"><input type="radio" id="custom-${index}-yes" name="custom-${index}" value="是" class="h-4 w-4 text-blue-600" required><label for="custom-${index}-yes">是</label><input type="radio" id="custom-${index}-no" name="custom-${index}" value="否" class="h-4 w-4 text-blue-600"><label for="custom-${index}-no">否</label><input type="radio" id="custom-${index}-neutral" name="custom-${index}" value="無意見" class="h-4 w-4 text-blue-600"><label for="custom-${index}-neutral">無意見</label></div></div>`).join('')}</div>`;
             }
-
-            formOutput.innerHTML = `
-                <div class="text-center mb-6"><h2 class="text-2xl font-bold">${topic}</h2><p class="text-md text-gray-600 mt-1">分享會回饋表單</p></div>
-                <form id="feedback-form" data-session-id="${sessionId}" data-session-topic="${topic}">
-                    ${standardQuestions.map(q => `
-                        <div class="mb-8">
-                            <label class="block text-md font-medium text-gray-700 mb-3">${q.text}</label>
-                            <div class="star-rating flex flex-row-reverse justify-end">
-                                <input type="radio" id="${q.id}-5" name="${q.id}" value="5" required><label for="${q.id}-5">★</label>
-                                <input type="radio" id="${q.id}-4" name="${q.id}" value="4"><label for="${q.id}-4">★</label>
-                                <input type="radio" id="${q.id}-3" name="${q.id}" value="3"><label for="${q.id}-3">★</label>
-                                <input type="radio" id="${q.id}-2" name="${q.id}" value="2"><label for="${q.id}-2">★</label>
-                                <input type="radio" id="${q.id}-1" name="${q.id}" value="1"><label for="${q.id}-1">★</label>
-                            </div>
-                        </div>
-                    `).join('')}
-                    ${customQuestionsHtml}
-                    <div class="mt-8 border-t pt-6">
-                        <label for="feedback-comments" class="block text-md font-medium text-gray-700 mb-2">其他建議或回饋：</label>
-                        <textarea id="feedback-comments" name="feedback-comments" rows="5" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="任何您想讓我們知道的建議..."></textarea>
-                    </div>
-                    <div class="mt-8 text-center">
-                        <button type="submit" class="w-full sm:w-auto px-10 py-3 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">提交回饋</button>
-                    </div>
-                </form>
-            `;
-            
+            formOutput.innerHTML = `<div class="text-center mb-6"><h2 class="text-2xl font-bold">${topic}</h2><p class="text-md text-gray-600 mt-1">分享會回饋表單</p></div><form id="feedback-form" data-session-id="${sessionId}" data-session-topic="${topic}">${standardQuestions.map(q => `<div class="mb-8"><label class="block text-md font-medium text-gray-700 mb-3">${q.text}</label><div class="star-rating flex flex-row-reverse justify-end"><input type="radio" id="${q.id}-5" name="${q.id}" value="5" required><label for="${q.id}-5">★</label><input type="radio" id="${q.id}-4" name="${q.id}" value="4"><label for="${q.id}-4">★</label><input type="radio" id="${q.id}-3" name="${q.id}" value="3"><label for="${q.id}-3">★</label><input type="radio" id="${q.id}-2" name="${q.id}" value="2"><label for="${q.id}-2">★</label><input type="radio" id="${q.id}-1" name="${q.id}" value="1"><label for="${q.id}-1">★</label></div></div>`).join('')}${customQuestionsHtml}<div class="mt-8 border-t pt-6"><label for="feedback-comments" class="block text-md font-medium text-gray-700 mb-2">其他建議或回饋：</label><textarea id="feedback-comments" name="feedback-comments" rows="5" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="任何您想讓我們知道的建議..."></textarea></div><div class="mt-8 text-center"><button type="submit" class="w-full sm:w-auto px-10 py-3 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700">提交回饋</button></div></form>`;
             document.getElementById('feedback-form').addEventListener('submit', handleFormSubmit);
         }
 
@@ -316,7 +333,6 @@
                 showModal('錯誤', '資料庫未連接，無法儲存回饋。', true);
                 return;
             }
-
             const form = e.target;
             const formData = new FormData(form);
             const data = {
@@ -327,26 +343,17 @@
                 customResponses: [],
                 comments: formData.get('feedback-comments')
             };
-
-            // Get star ratings
             ['overall-satisfaction', 'content-relevance', 'speaker-clarity', 'practicality'].forEach(id => {
                 data.ratings[id] = parseInt(formData.get(id), 10);
             });
-
-            // Get custom question responses
-            const customQuestions = form.querySelectorAll('[data-question-text]');
-            customQuestions.forEach((label, index) => {
+            form.querySelectorAll('[data-question-text]').forEach((label, index) => {
                 const question = label.dataset.questionText;
                 const answer = formData.get(`custom-${index}`);
-                if (question && answer) {
-                    data.customResponses.push({ question, answer });
-                }
+                if (question && answer) data.customResponses.push({ question, answer });
             });
-
             try {
-                const docRef = await addDoc(collection(db, `/artifacts/${appId}/public/feedbackSubmissions`), data);
-                console.log("Document written with ID: ", docRef.id);
-                showModal('提交成功！', '感謝您的寶貴回饋。您的意見是我們進步的動力！');
+                await addDoc(collection(db, `/artifacts/${appId}/public/feedbackSubmissions`), data);
+                showModal('提交成功！', '感謝您的寶貴回饋。');
                 form.reset();
             } catch (error) {
                 console.error("Error adding document: ", error);
@@ -361,33 +368,20 @@
                 return;
             }
             statsContainer.innerHTML = '<p class="text-center text-gray-500">正在載入數據...</p>';
-            
             const feedbackQuery = query(collection(db, `/artifacts/${appId}/public/feedbackSubmissions`));
-            
             onSnapshot(feedbackQuery, (querySnapshot) => {
                 const submissions = [];
-                querySnapshot.forEach((doc) => {
-                    submissions.push({ id: doc.id, ...doc.data() });
-                });
-
+                querySnapshot.forEach((doc) => submissions.push({ id: doc.id, ...doc.data() }));
                 if (submissions.length === 0) {
                     statsContainer.innerHTML = '<p class="text-center text-gray-500">目前沒有任何回饋資料。</p>';
                     return;
                 }
-
-                // Group submissions by session
                 const sessions = submissions.reduce((acc, sub) => {
                     const { sessionId, sessionTopic } = sub;
-                    if (!acc[sessionId]) {
-                        acc[sessionId] = {
-                            topic: sessionTopic,
-                            submissions: []
-                        };
-                    }
+                    if (!acc[sessionId]) acc[sessionId] = { topic: sessionTopic, submissions: [] };
                     acc[sessionId].submissions.push(sub);
                     return acc;
                 }, {});
-
                 renderStats(sessions);
             }, (error) => {
                 console.error("Error fetching stats:", error);
@@ -399,36 +393,13 @@
             statsContainer.innerHTML = Object.entries(sessions).map(([sessionId, sessionData]) => {
                 const subCount = sessionData.submissions.length;
                 const avgRatings = {
-                    'overall-satisfaction': (sessionData.submissions.reduce((sum, s) => sum + s.ratings['overall-satisfaction'], 0) / subCount).toFixed(1),
-                    'content-relevance': (sessionData.submissions.reduce((sum, s) => sum + s.ratings['content-relevance'], 0) / subCount).toFixed(1),
-                    'speaker-clarity': (sessionData.submissions.reduce((sum, s) => sum + s.ratings['speaker-clarity'], 0) / subCount).toFixed(1),
-                    'practicality': (sessionData.submissions.reduce((sum, s) => sum + s.ratings['practicality'], 0) / subCount).toFixed(1),
+                    'overall-satisfaction': (sessionData.submissions.reduce((sum, s) => sum + (s.ratings['overall-satisfaction'] || 0), 0) / subCount).toFixed(1),
+                    'content-relevance': (sessionData.submissions.reduce((sum, s) => sum + (s.ratings['content-relevance'] || 0), 0) / subCount).toFixed(1),
+                    'speaker-clarity': (sessionData.submissions.reduce((sum, s) => sum + (s.ratings['speaker-clarity'] || 0), 0) / subCount).toFixed(1),
+                    'practicality': (sessionData.submissions.reduce((sum, s) => sum + (s.ratings['practicality'] || 0), 0) / subCount).toFixed(1),
                 };
-
-                const commentsHtml = sessionData.submissions
-                    .filter(s => s.comments && s.comments.trim() !== '')
-                    .map(s => `<li class="border-b py-2 text-sm">${s.comments}</li>`).join('');
-
-                return `
-                    <div class="bg-white p-6 rounded-2xl shadow-lg">
-                        <h2 class="text-xl font-bold text-gray-900">${sessionData.topic}</h2>
-                        <p class="text-sm text-gray-500 mb-4">總共 ${subCount} 份回饋</p>
-                        
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-center">
-                            <div><p class="text-2xl font-bold">${avgRatings['overall-satisfaction']}</p><p class="text-xs text-gray-500">整體滿意度</p></div>
-                            <div><p class="text-2xl font-bold">${avgRatings['content-relevance']}</p><p class="text-xs text-gray-500">內容幫助</p></div>
-                            <div><p class="text-2xl font-bold">${avgRatings['speaker-clarity']}</p><p class="text-xs text-gray-500">表達清晰</p></div>
-                            <div><p class="text-2xl font-bold">${avgRatings['practicality']}</p><p class="text-xs text-gray-500">實務應用</p></div>
-                        </div>
-
-                        <div>
-                            <h3 class="text-md font-semibold mt-4 mb-2">其他建議：</h3>
-                            <ul class="list-disc list-inside bg-gray-50 p-3 rounded-lg max-h-40 overflow-y-auto">
-                                ${commentsHtml || '<li class="text-gray-400 text-sm">暫無文字回饋</li>'}
-                            </ul>
-                        </div>
-                    </div>
-                `;
+                const commentsHtml = sessionData.submissions.filter(s => s.comments && s.comments.trim() !== '').map(s => `<li class="border-b py-2 text-sm">${s.comments}</li>`).join('');
+                return `<div class="bg-white p-6 rounded-2xl shadow-lg"><h2 class="text-xl font-bold text-gray-900">${sessionData.topic}</h2><p class="text-sm text-gray-500 mb-4">總共 ${subCount} 份回饋</p><div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-center"><div><p class="text-2xl font-bold">${avgRatings['overall-satisfaction']}</p><p class="text-xs text-gray-500">整體滿意度</p></div><div><p class="text-2xl font-bold">${avgRatings['content-relevance']}</p><p class="text-xs text-gray-500">內容幫助</p></div><div><p class="text-2xl font-bold">${avgRatings['speaker-clarity']}</p><p class="text-xs text-gray-500">表達清晰</p></div><div><p class="text-2xl font-bold">${avgRatings['practicality']}</p><p class="text-xs text-gray-500">實務應用</p></div></div><div><h3 class="text-md font-semibold mt-4 mb-2">其他建議：</h3><ul class="list-disc list-inside bg-gray-50 p-3 rounded-lg max-h-40 overflow-y-auto">${commentsHtml || '<li class="text-gray-400 text-sm">暫無文字回饋</li>'}</ul></div></div>`;
             }).join('');
         }
 
@@ -442,7 +413,6 @@
         function showModal(title, message, isError = false) {
             modalTitle.textContent = title;
             modalMessage.textContent = message;
-            
             if (isError) {
                 modalIconContainer.className = 'mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100';
                 modalIconContainer.innerHTML = `<svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
@@ -450,47 +420,31 @@
                 modalIconContainer.className = 'mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100';
                 modalIconContainer.innerHTML = `<svg class="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`;
             }
-
             messageModal.classList.remove('hidden');
             messageModal.classList.add('flex');
         }
 
         // --- Gemini API Call ---
         async function getCustomQuestions(topic, summary, fileContent) {
-            const prompt = `你是一個活動問卷設計專家。請根據以下 AI 分享會的資訊，設計 2 個最相關、最能評估學習成效的封閉式問題（是/否/無意見）。
-            主題：${topic}
-            內容摘要：${summary}
-            ${fileContent ? `補充文件內容：\n${fileContent.substring(0, 3000)}` : ''}
-            請確保問題簡潔明瞭，並以繁體中文回答。`;
-
+            const prompt = `你是一個活動問卷設計專家。請根據以下 AI 分享會的資訊，設計 2 個最相關、最能評估學習成效的封閉式問題（是/否/無意見）。主題：${topic} 內容摘要：${summary} ${fileContent ? `補充文件內容：\n${fileContent.substring(0, 3000)}` : ''} 請確保問題簡潔明瞭，並以繁體中文回答。`;
             const payload = {
                 contents: [{ role: "user", parts: [{ text: prompt }] }],
                 generationConfig: {
                     responseMimeType: "application/json",
-                    responseSchema: {
-                        type: "OBJECT", properties: {
-                            questions: { type: "ARRAY", items: {
-                                type: "OBJECT", properties: { question: { type: "STRING" } }, required: ["question"]
-                            }}
-                        }, required: ["questions"]
-                    }
+                    responseSchema: { type: "OBJECT", properties: { questions: { type: "ARRAY", items: { type: "OBJECT", properties: { question: { type: "STRING" } }, required: ["question"] }}}, required: ["questions"] }
                 }
             };
             const apiKey = "";
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-            
-            // Using a single fetch with error handling, as backoff is complex for this scope
             try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
-                });
+                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                 if (!response.ok) throw new Error(`API request failed with status ${response.status}`);
                 const result = await response.json();
                 const jsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
                 return JSON.parse(jsonText).questions || [];
             } catch (error) {
                 console.error("Gemini API call failed:", error);
-                return []; // Return empty array on failure
+                return [];
             }
         }
 
