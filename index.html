@@ -124,42 +124,29 @@
             </div>
         </div>
 
-    <script type="module">
+   <script type="module">
         // Firebase Imports
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, query, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- IMPORTANT: Firebase Config ---
-        // 請將此處的範例設定替換成您自己 Firebase 專案的實際設定。
+        // --- Configs ---
         const firebaseConfig = {
-  apiKey: "AIzaSyCbRwvK7guh61K9kp2QqTrEOE7nuEXIzPg",
-  authDomain: "ai-feedback-app-simhope-ai.firebaseapp.com",
-  projectId: "ai-feedback-app-simhope-ai",
-  storageBucket: "ai-feedback-app-simhope-ai.firebasestorage.app",
-  messagingSenderId: "415250131591",
-  appId: "1:415250131591:web:4ca7f131bc0340f1fbe622",
-  measurementId: "G-TQYH2D77YG"
-};
-        
-        // --- IMPORTANT: Firestore Security Rules ---
-        // **FIXED**: The path has been corrected. Please update your Firestore rules with this new version.
-        /*
-        rules_version = '2';
-        service cloud.firestore {
-          match /databases/{database}/documents {
-            // This path now correctly matches the code's path
-            match /artifacts/{appId}/public/data/feedbackSubmissions/{submissionId} {
-              allow read, create: if true;
-            }
-          }
-        }
-        */
-        
+            apiKey: "AIzaSyCbRwvK7guh61K9kp2QqTrEOE7nuEXIzPg",
+            authDomain: "ai-feedback-app-simhope-ai.firebaseapp.com",
+            projectId: "ai-feedback-app-simhope-ai",
+            storageBucket: "ai-feedback-app-simhope-ai.firebasestorage.app",
+            messagingSenderId: "415250131591",
+            appId: "1:415250131591:web:4ca7f131bc0340f1fbe622",
+            measurementId: "G-TQYH2D77YG"
+        };
         const appId = 'default-app-id';
-        const CHART_COLORS = ['#ef4444', '#f97316', '#eab308', '#84cc16', '#22c55e'].reverse(); // 從 5 星到 1 星
+        const CHART_COLORS = ['#ef4444', '#f97316', '#eab308', '#84cc16', '#22c55e'].reverse();
+
+        // --- Global Variables ---
         let db, auth, userId;
-        let nextQuestionNumber = 1; // 新增題號計數器
+        let nextQuestionNumber = 1;
+        let manualQuestionCounter = 0;
 
         // --- DOM Elements ---
         const loginView = document.getElementById('login-view');
@@ -189,76 +176,26 @@
 
         // --- Firebase Initialization ---
         async function initializeFirebase() {
-            if (!firebaseConfig || firebaseConfig.apiKey === "AIzaSyxxxxxxxxxxxxxxxxxxxxxxx") {
-                showModal('設定錯誤', '您尚未設定有效的 Firebase 設定。請將程式碼中的 `firebaseConfig` 物件替換成您從 Firebase 專案中取得的實際設定。', true);
-                return;
-            }
-
             try {
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
                 onAuthStateChanged(auth, (user) => {
-                    if (user) {
-                        userId = user.uid;
-                    } else {
-                        signInAnonymously(auth).catch((error) => {
-                            console.error("Anonymous sign-in failed:", error);
-                            if (error.code === 'auth/api-key-not-valid') {
-                                showModal('Firebase 連線錯誤', '您提供的 Firebase API 金鑰無效。請確認您已將正確的 `firebaseConfig` 貼入程式碼中。', true);
-                            } else {
-                                showModal('認證失敗', `無法登入，錯誤：${error.message}`, true);
-                            }
-                        });
-                    }
+                    if (user) userId = user.uid;
+                    else signInAnonymously(auth).catch((error) => console.error("Anonymous sign-in failed:", error));
                 });
             } catch (error) {
                 console.error("Firebase initialization failed:", error);
-                showModal('Firebase 初始化失敗', '請檢查您的 firebaseConfig 物件格式是否正確。', true);
+                showModal('Firebase 初始化失敗', '請檢查您的 firebaseConfig 設定。', true);
             }
         }
 
-        // --- Login Logic ---
+        // --- Login & View Management ---
         function showAppView(isManager = false) {
             loginView.classList.add('hidden');
             appView.classList.remove('hidden');
             if (isManager) {
-                // 如果是管理者，直接顯示後台
                 toggleViewContainer.classList.remove('hidden');
-                generatorView.classList.add('hidden');
-                adminView.classList.remove('hidden');
-                toggleViewBtn.textContent = '返回表單生成器';
-                loadAndRenderStats(); // 載入數據
-            }
-            // 與會者維持不變，預設顯示生成器畫面
-        }
-
-        attendeeBtn.addEventListener('click', () => { showAppView(false); });
-        managerBtn.addEventListener('click', () => { passwordSection.classList.remove('hidden'); });
-        loginSubmitBtn.addEventListener('click', () => {
-            if (passwordInput.value === 'admin123') {
-                showAppView(true);
-            } else {
-                showModal('登入失敗', '密碼錯誤，請重試。', true);
-                passwordInput.value = '';
-            }
-        });
-
-        // --- Event Listeners ---
-        toggleViewBtn.addEventListener('click', toggleAdminView);
-        generateBtn.addEventListener('click', handleGenerateForm);
-        closeModalBtn.addEventListener('click', () => {
-             messageModal.classList.add('hidden');
-             messageModal.classList.remove('flex');
-        });
-
-        // --- View Management ---
-        function toggleAdminView() {
-            if (generatorView.classList.contains('hidden')) {
-                generatorView.classList.remove('hidden');
-                adminView.classList.add('hidden');
-                toggleViewBtn.textContent = '切換到數據後台';
-            } else {
                 generatorView.classList.add('hidden');
                 adminView.classList.remove('hidden');
                 toggleViewBtn.textContent = '返回表單生成器';
@@ -266,55 +203,33 @@
             }
         }
 
-        // --- File Handling ---
-        async function getFileContent() {
-            const file = fileUpload.files[0];
-            if (!file) return "";
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = async (event) => {
-                    try {
-                        if (file.name.endsWith('.docx')) {
-                            const result = await mammoth.extractRawText({ arrayBuffer: event.target.result });
-                            resolve(result.value);
-                        } else {
-                            resolve("（此檔案格式暫不支援預覽）");
-                        }
-                    } catch (err) { reject(err); }
-                };
-                reader.onerror = (error) => reject(error);
-                reader.readAsArrayBuffer(file);
-            });
-        }
-
-        // --- Form Generation Logic ---
-        async function handleGenerateForm() {
-            const topic = sessionTopicInput.value.trim();
-            const summary = sessionSummaryInput.value.trim();
-            if (!topic || !summary) {
-                showModal('資料不完整', '請輸入分享會的主題和內容摘要。', true);
-                return;
-            }
-            setLoading(true);
-            let fileContent = "";
-            try {
-                if (fileUpload.files.length > 0) fileContent = await getFileContent();
-                const customQuestions = await getCustomQuestions(topic, summary, fileContent);
-                const sessionId = crypto.randomUUID();
-                renderForm(topic, customQuestions, sessionId);
-                formOutput.classList.remove('hidden');
-            } catch (error) {
-                console.error('Error generating form:', error);
-                showModal('生成失敗', 'AI 無法生成問題，將僅使用標準問題。', true);
-                renderForm(topic, [], crypto.randomUUID());
-                formOutput.classList.remove('hidden');
-            } finally {
-                setLoading(false);
+        function toggleAdminView() {
+            const isGeneratorHidden = generatorView.classList.contains('hidden');
+            generatorView.classList.toggle('hidden', !isGeneratorHidden);
+            adminView.classList.toggle('hidden', isGeneratorHidden);
+            toggleViewBtn.textContent = isGeneratorHidden ? '切換到數據後台' : '返回表單生成器';
+            if (isGeneratorHidden) {
+                // This means we are switching TO the generator, no need to load stats.
+            } else {
+                // This means we are switching TO the admin view.
+                loadAndRenderStats();
             }
         }
         
-        // --- Form Rendering ---
-       // --- Form Rendering --- (全新版本，支援編輯 AI 問題)
+        // --- Form Generation (AI Disabled) ---
+        async function handleGenerateForm() {
+            const topic = sessionTopicInput.value.trim();
+            if (!topic) {
+                showModal('資料不完整', '請至少輸入分享會的主題。', true);
+                return;
+            }
+            setLoading(true);
+            // AI 功能已停用：直接傳入空陣列來建立基礎表單
+            renderForm(topic, [], crypto.randomUUID());
+            formOutput.classList.remove('hidden');
+            setLoading(false);
+        }
+
         function renderForm(topic, customQuestions, sessionId) {
             const standardQuestions = [
                 { id: 'overall-satisfaction', text: '1. 整體而言，您對這次的分享會滿意度如何？' },
@@ -322,68 +237,28 @@
                 { id: 'speaker-clarity', text: '3. 講者的表達是否清晰易懂？' },
                 { id: 'practicality', text: '4. 您認為分享會的內容在實務上應用的可能性高嗎？' }
             ];
-            
-            let customQuestionsHtml = '';
-            if (customQuestions && customQuestions.length > 0) {
-                 // *** 核心修改：將 label 換成 input ***
-                 const aiQuestions = customQuestions.map((q, index) => `
-                    <div class="mb-6 ai-question">
-                        <div class="flex items-center mb-3">
-                            <span class="font-semibold text-gray-800 mr-2">${index + 5}.</span>
-                            <input type="text" value="${q.question}" class="w-full px-2 py-1 border border-gray-300 rounded-lg ai-question-input">
+
+            nextQuestionNumber = standardQuestions.length + 1;
+
+            formOutput.innerHTML = `
+                <div class="text-center mb-6"><h2 class="text-2xl font-bold">${topic}</h2><p class="text-md text-gray-600 mt-1">分享會回饋表單</p></div>
+                <form id="feedback-form" data-session-id="${sessionId}" data-session-topic="${topic}">
+                    <div class="mb-6"><label for="submitter-name" class="block text-md font-medium mb-2">您的姓名：</label><input type="text" id="submitter-name" name="submitter-name" class="w-full px-4 py-2 border border-gray-300 rounded-lg" required></div>
+                    <div class="mb-8"><label for="submitter-department" class="block text-md font-medium mb-2">您的部門：</label><input type="text" id="submitter-department" name="submitter-department" class="w-full px-4 py-2 border border-gray-300 rounded-lg" required></div>
+                    ${standardQuestions.map(q => `<div class="mb-8"><label class="block text-md font-medium text-gray-700 mb-3">${q.text}</label><div class="star-rating flex flex-row-reverse justify-end">${[5,4,3,2,1].map(i => `<input type="radio" id="${q.id}-${i}" name="${q.id}" value="${i}" required><label for="${q.id}-${i}">★</label>`).join('')}</div></div>`).join('')}
+                    <div id="editable-questions-container"></div>
+                    <div class="mt-8 border-t pt-6"><label for="feedback-comments" class="block text-md font-medium mb-2">其他建議或回饋：</label><textarea id="feedback-comments" name="feedback-comments" rows="5" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></textarea></div>
+                    <div id="form-editor-controls" class="mt-8 border-t pt-6 text-sm">
+                        <h3 class="font-semibold mb-2">新增問題</h3>
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" id="add-star-btn" class="px-3 py-1 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">新增星星評分</button>
+                            <button type="button" id="add-yesno-btn" class="px-3 py-1 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">新增是非題</button>
+                            <button type="button" id="add-text-btn" class="px-3 py-1 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">新增簡答題</button>
                         </div>
-                        <div class="flex items-center space-x-4">
-                            <input type="radio" id="custom-${index}-yes" name="custom-${index}" value="是" class="h-4 w-4 text-blue-600" required><label for="custom-${index}-yes">是</label>
-                            <input type="radio" id="custom-${index}-no" name="custom-${index}" value="否" class="h-4 w-4 text-blue-600"><label for="custom-${index}-no">否</label>
-                            <input type="radio" id="custom-${index}-neutral" name="custom-${index}" value="無意見" class="h-4 w-4 text-blue-600"><label for="custom-${index}-neutral">無意見</label>
-                        </div>
-                    </div>`).join('');
-                
-                customQuestionsHtml = `
-                    <div class="mt-8 border-t pt-6">
-                        <h3 class="text-lg font-semibold text-gray-800 mb-4">針對本次主題 (可編輯)</h3>
-                        ${aiQuestions}
-                    </div>`;
-            }
-
-            nextQuestionNumber = standardQuestions.length + (customQuestions ? customQuestions.length : 0) + 1;
-            
-            formOutput.innerHTML = `<div class="text-center mb-6"><h2 class="text-2xl font-bold">${topic}</h2><p class="text-md text-gray-600 mt-1">分享會回饋表單</p></div>
-            <form id="feedback-form" data-session-id="${sessionId}" data-session-topic="${topic}">
-                <div class="mb-6">
-                    <label for="submitter-name" class="block text-md font-medium text-gray-700 mb-2">您的姓名：</label>
-                    <input type="text" id="submitter-name" name="submitter-name" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="請輸入您的姓名" required>
-                </div>
-                <div class="mb-8">
-                    <label for="submitter-department" class="block text-md font-medium text-gray-700 mb-2">您的部門：</label>
-                    <input type="text" id="submitter-department" name="submitter-department" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="請輸入您的部門" required>
-                </div>
-                ${standardQuestions.map(q => `<div class="mb-8"><label class="block text-md font-medium text-gray-700 mb-3">${q.text}</label><div class="star-rating flex flex-row-reverse justify-end"><input type="radio" id="${q.id}-5" name="${q.id}" value="5" required><label for="${q.id}-5">★</label><input type="radio" id="${q.id}-4" name="${q.id}" value="4"><label for="${q.id}-4">★</label><input type="radio" id="${q.id}-3" name="${q.id}" value="3"><label for="${q.id}-3">★</label><input type="radio" id="${q.id}-2" name="${q.id}" value="2"><label for="${q.id}-2">★</label><input type="radio" id="${q.id}-1" name="${q.id}" value="1"><label for="${q.id}-1">★</label></div></div>`).join('')}
-                
-                <div id="editable-questions-container">${customQuestionsHtml}</div>
-
-                <div class="mt-8 border-t pt-6">
-                    <label for="feedback-comments" class="block text-md font-medium text-gray-700 mb-2">其他建議或回饋：</label>
-                    <textarea id="feedback-comments" name="feedback-comments" rows="5" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="任何您想讓我們知道的建議..."></textarea>
-                </div>
-
-                <div id="form-editor-controls" class="mt-8 border-t pt-6 text-sm">
-                    <h3 class="font-semibold mb-2">編輯表單</h3>
-                    <div class="flex flex-wrap gap-2">
-                        <button type="button" id="add-star-btn" class="px-3 py-1 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">新增星星評分</button>
-                        <button type="button" id="add-yesno-btn" class="px-3 py-1 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">新增是非題</button>
-                        <button type="button" id="add-text-btn" class="px-3 py-1 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">新增簡答題</button>
+                        <div class="mt-4"><button type="button" id="publish-btn" class="w-full px-4 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700">發布並產生 QR Code</button></div>
                     </div>
-                    <div class="mt-4">
-                        <button type="button" id="publish-btn" class="w-full px-4 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700">
-                            發布並產生 QR Code
-                        </button>
-                    </div>
-                </div>
-                <div class="mt-8 text-center">
-                    <button type="submit" class="w-full sm:w-auto px-10 py-3 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700">提交回饋</button>
-                </div>
-            </form>`;
+                    <div class="mt-8 text-center"><button type="submit" class="w-full sm:w-auto px-10 py-3 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700">提交回饋</button></div>
+                </form>`;
 
             document.getElementById('feedback-form').addEventListener('submit', handleFormSubmit);
             document.getElementById('add-star-btn').addEventListener('click', () => addQuestion('star'));
@@ -391,104 +266,52 @@
             document.getElementById('add-text-btn').addEventListener('click', () => addQuestion('text'));
             document.getElementById('publish-btn').addEventListener('click', handlePublishForm);
         }
-function addQuestion(type) {
+
+        function addQuestion(type) {
             const container = document.getElementById('editable-questions-container');
-            const questionId = `manual-${type}-${manualQuestionCounter++}`;
-            let questionHtml = '';
-
+            const questionId = `manual-${manualQuestionCounter++}`;
             const questionLabel = `<span class="font-semibold text-gray-800 mr-2">${nextQuestionNumber}.</span>`;
-
+            let questionHtml = '';
+            const inputHtml = `<input type="text" placeholder="請在此輸入您的問題..." class="w-full px-2 py-1 border border-gray-300 rounded-lg manual-question-input" required>`;
             switch (type) {
                 case 'star':
-                    questionHtml = `
-                        <div class="mb-8 manual-question" data-type="star">
-                            <div class="flex items-center mb-3">
-                                ${questionLabel}
-                                <input type="text" placeholder="請在此輸入您的評分問題..." class="w-full px-2 py-1 border border-gray-300 rounded-lg manual-question-input" required>
-                            </div>
-                            <div class="star-rating flex flex-row-reverse justify-end">
-                                <input type="radio" id="${questionId}-5" name="${questionId}" value="5" required><label for="${questionId}-5">★</label>
-                                <input type="radio" id="${questionId}-4" name="${questionId}" value="4"><label for="${questionId}-4">★</label>
-                                <input type="radio" id="${questionId}-3" name="${questionId}" value="3"><label for="${questionId}-3">★</label>
-                                <input type="radio" id="${questionId}-2" name="${questionId}" value="2"><label for="${questionId}-2">★</label>
-                                <input type="radio" id="${questionId}-1" name="${questionId}" value="1"><label for="${questionId}-1">★</label>
-                            </div>
-                        </div>`;
+                    questionHtml = `<div class="mb-8 manual-question" data-type="star"><div class="flex items-center mb-3">${questionLabel}${inputHtml}</div><div class="star-rating flex flex-row-reverse justify-end">${[5,4,3,2,1].map(i => `<input type="radio" id="${questionId}-${i}" name="${questionId}" value="${i}" required><label for="${questionId}-${i}">★</label>`).join('')}</div></div>`;
                     break;
                 case 'yesno':
-                    questionHtml = `
-                        <div class="mb-6 manual-question" data-type="yesno">
-                            <div class="flex items-center mb-3">
-                                ${questionLabel}
-                                <input type="text" placeholder="請在此輸入您的是非問題..." class="w-full px-2 py-1 border border-gray-300 rounded-lg manual-question-input" required>
-                            </div>
-                            <div class="flex items-center space-x-4">
-                                <input type="radio" id="${questionId}-yes" name="${questionId}" value="是" class="h-4 w-4 text-blue-600" required><label for="${questionId}-yes">是</label>
-                                <input type="radio" id="${questionId}-no" name="${questionId}" value="否" class="h-4 w-4 text-blue-600"><label for="${questionId}-no">否</label>
-                                <input type="radio" id="${questionId}-neutral" name="${questionId}" value="無意見" class="h-4 w-4 text-blue-600"><label for="${questionId}-neutral">無意見</label>
-                            </div>
-                        </div>`;
+                    questionHtml = `<div class="mb-6 manual-question" data-type="yesno"><div class="flex items-center mb-3">${questionLabel}${inputHtml}</div><div class="flex items-center space-x-4"><input type="radio" id="${questionId}-yes" name="${questionId}" value="是" required><label for="${questionId}-yes">是</label><input type="radio" id="${questionId}-no" name="${questionId}" value="否"><label for="${questionId}-no">否</label><input type="radio" id="${questionId}-neutral" name="${questionId}" value="無意見"><label for="${questionId}-neutral">無意見</label></div></div>`;
                     break;
                 case 'text':
-                    questionHtml = `
-                        <div class="mb-8 manual-question" data-type="text">
-                            <div class="flex items-center mb-2">
-                                ${questionLabel}
-                                <input type="text" placeholder="請在此輸入您的簡答問題..." class="w-full px-2 py-1 border border-gray-300 rounded-lg manual-question-input" required>
-                            </div>
-                            <textarea name="${questionId}" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="回答..."></textarea>
-                        </div>`;
+                    questionHtml = `<div class="mb-8 manual-question" data-type="text"><div class="flex items-center mb-2">${questionLabel}${inputHtml}</div><textarea name="${questionId}" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="回答..."></textarea></div>`;
                     break;
             }
             container.insertAdjacentHTML('beforeend', questionHtml);
-            nextQuestionNumber++; // 題號加 1，為下一個問題做準備
+            nextQuestionNumber++;
         }
-// --- Data Handling (Firebase) ---
-        // --- Data Handling (Firebase) --- (全新版本)
-        // --- Data Handling (Firebase) --- (支援編輯 AI 問題的版本)
+
+        // --- Data Submission & Publishing ---
         async function handleFormSubmit(e) {
             e.preventDefault();
-            if (!db) {
-                showModal('錯誤', '資料庫未連接，無法儲存回饋。', true);
-                return;
-            }
             const form = e.target;
             const formData = new FormData(form);
-            
             const responses = [];
             responses.push({ question: "您的姓名：", answer: formData.get('submitter-name') });
             responses.push({ question: "您的部門：", answer: formData.get('submitter-department') });
-
             form.querySelectorAll('.star-rating').forEach(div => {
                 const label = div.previousElementSibling;
-                const question = label.textContent;
                 const answer = formData.get(div.querySelector('input').name);
-                responses.push({ question, answer: answer ? `${answer} 星` : '' });
+                responses.push({ question: label.textContent, answer: answer ? `${answer}` : '' });
             });
-
-            // *** 核心修改：從 .ai-question-input 和 .manual-question-input 讀取問題文字 ***
-            // 收集 AI 問題
-            form.querySelectorAll('.ai-question').forEach((div, index) => {
-                const question = div.querySelector('.ai-question-input').value;
-                const answer = formData.get(`custom-${index}`);
-                if (question) responses.push({ question, answer });
-            });
-
-            // 收集手動問題
             form.querySelectorAll('.manual-question').forEach(div => {
                 const question = div.querySelector('.manual-question-input').value;
-                const questionType = div.dataset.type;
-                const inputs = div.querySelectorAll('input[type="radio"], textarea');
                 let answer = '';
-                if (questionType === 'text') {
-                    answer = inputs[inputs.length - 1].value;
+                if (div.dataset.type === 'text') {
+                    answer = div.querySelector('textarea').value;
                 } else {
-                    const checkedRadio = Array.from(inputs).find(radio => radio.checked);
+                    const checkedRadio = div.querySelector('input[type="radio"]:checked');
                     answer = checkedRadio ? checkedRadio.value : '';
                 }
                 if (question) responses.push({ question, answer });
             });
-
             responses.push({ question: "其他建議或回饋：", answer: formData.get('feedback-comments') });
 
             const data = {
@@ -497,7 +320,6 @@ function addQuestion(type) {
                 submittedAt: serverTimestamp(),
                 responses: responses
             };
-
             try {
                 await addDoc(collection(db, `artifacts/${appId}/public/data/feedbackSubmissions`), data);
                 showModal('提交成功！', '感謝您的寶貴回饋。');
@@ -506,297 +328,206 @@ function addQuestion(type) {
                 formOutput.classList.add('hidden');
             } catch (error) {
                 console.error("Error adding document: ", error);
-                showModal('提交失敗', '無法將您的回饋儲存至資料庫，請稍後再試。', true);
+                showModal('提交失敗', '無法儲存您的回饋。', true);
             }
         }
 
-        // --- 發布表單並產生 QR Code --- (支援編輯 AI 問題的版本)
         async function handlePublishForm() {
-            if (!db) {
-                showModal('錯誤', '資料庫未連接，無法發布。', true);
-                return;
-            }
-
             const form = document.getElementById('feedback-form');
-            const topic = form.dataset.sessionTopic;
-
             const questions = [];
-            questions.push({ type: 'name', text: '您的姓名：', required: true });
-            questions.push({ type: 'name', text: '您的部門：', required: true }); // 也把部門加進來
-
-            form.querySelectorAll('.star-rating').forEach(div => {
-                const label = div.previousElementSibling;
-                questions.push({ type: 'star', text: label.textContent });
-            });
-            
-            // *** 核心修改：從 input.value 讀取問題文字 ***
-            // 收集 AI 問題
-            document.querySelectorAll('.ai-question').forEach(div => {
-                const text = div.querySelector('.ai-question-input').value;
-                questions.push({ type: 'yesno', text: text });
-            });
-
-            // 收集手動問題
-            document.querySelectorAll('.manual-question').forEach(div => {
-                const type = div.dataset.type;
-                const text = div.querySelector('.manual-question-input').value;
-                questions.push({ type: type, text: text });
-            });
-
+            questions.push({ type: 'name', text: '您的姓名：' });
+            questions.push({ type: 'department', text: '您的部門：' });
+            form.querySelectorAll('.star-rating').forEach(div => questions.push({ type: 'star', text: div.previousElementSibling.textContent }));
+            document.querySelectorAll('.manual-question').forEach(div => questions.push({ type: div.dataset.type, text: div.querySelector('.manual-question-input').value }));
             questions.push({ type: 'textarea', text: '其他建議或回饋：' });
 
             const formStructure = {
-                topic: topic,
+                topic: form.dataset.sessionTopic,
                 questions: questions,
                 createdAt: serverTimestamp()
             };
-
             try {
                 const docRef = await addDoc(collection(db, "publishedForms"), formStructure);
-                const formId = docRef.id;
-                const url = `${window.location.origin}${window.location.pathname}?formId=${formId}`;
+                const url = `${window.location.origin}${window.location.pathname}?formId=${docRef.id}`;
                 showQrCodeModal(url);
             } catch (error) {
                 console.error("Error publishing form: ", error);
-                showModal('發布失敗', '無法將表單儲存至資料庫。', true);
+                showModal('發布失敗', '無法儲存表單結構。', true);
             }
         }
-
-        // --- 顯示 QR Code 彈出視窗 ---
-        function showQrCodeModal(url) {
-            const qrContainer = document.getElementById('qrcode');
-            const linkInput = document.getElementById('form-link');
-            const qrContent = document.getElementById('modal-qr-content');
-            
-            modalTitle.textContent = '發布成功！';
-            modalMessage.textContent = '任何人都可以透過此連結或 QR Code 填寫回饋。';
-            qrContainer.innerHTML = ''; // 清空舊的 QR Code
-            
-            // 產生 QR Code
-            const qr = qrcode(0, 'L');
-            qr.addData(url);
-            qr.make();
-            qrContainer.innerHTML = qr.createImgTag(5, 2); // size 5, margin 2
-
-            linkInput.value = url;
-            qrContent.classList.remove('hidden');
-            
-            messageModal.classList.remove('hidden');
-            messageModal.classList.add('flex');
-
-            // 隱藏預設的 icon
-            modalIconContainer.classList.add('hidden');
-        }
-
-        // --- 根據 URL 載入公開表單 ---
+        
+        // --- Public Form Rendering ---
         async function loadAndRenderPublicForm(formId) {
-            // 隱藏登入和主應用介面
             loginView.classList.add('hidden');
             appView.classList.add('hidden');
-            
             try {
-                // Firebase 初始化
-                const app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-
+                if (!db) {
+                    const app = initializeApp(firebaseConfig);
+                    db = getFirestore(app);
+                }
                 const docRef = doc(db, "publishedForms", formId);
                 const docSnap = await getDoc(docRef);
+                if (!docSnap.exists()) throw new Error("Form not found");
+                
+                const data = docSnap.data();
+                const publicFormContainer = document.createElement('div');
+                publicFormContainer.className = "container mx-auto p-4 sm:p-6 lg:p-8 max-w-2xl";
+                
+                const questionsHtml = data.questions.map((q, index) => {
+                    const name = `q-${index}`;
+                    const label = `<label class="block text-md font-medium text-gray-700 mb-2">${q.text}</label>`;
+                    switch (q.type) {
+                        case 'name':
+                        case 'department':
+                            return `<div class="mb-6">${label}<input type="text" name="${name}" class="w-full px-4 py-2 border border-gray-300 rounded-lg" required></div>`;
+                        case 'star':
+                            return `<div class="mb-8">${label}<div class="star-rating flex flex-row-reverse justify-end">${[5,4,3,2,1].map(i => `<input type="radio" id="${name}-${i}" name="${name}" value="${i}" required><label for="${name}-${i}">★</label>`).join('')}</div></div>`;
+                        case 'yesno':
+                            return `<div class="mb-6">${label}<div class="flex items-center space-x-4"><input type="radio" id="${name}-yes" name="${name}" value="是" required><label for="${name}-yes">是</label><input type="radio" id="${name}-no" name="${name}" value="否"><label for="${name}-no">否</label><input type="radio" id="${name}-neutral" name="${name}" value="無意見"><label for="${name}-neutral">無意見</label></div></div>`;
+                        case 'text':
+                            return `<div class="mb-6">${label}<textarea name="${name}" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></textarea></div>`;
+                        case 'textarea':
+                            return `<div class="mt-8 border-t pt-6">${label}<textarea name="${name}" rows="5" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></textarea></div>`;
+                        default: return '';
+                    }
+                }).join('');
 
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    // 渲染公開表單
-                    // (我們需要在 body 中建立一個新的容器來放公開表單)
-                    const publicFormContainer = document.createElement('div');
-                    publicFormContainer.className = "container mx-auto p-4 sm:p-6 lg:p-8 max-w-2xl";
-                    
-                    let questionsHtml = data.questions.map((q, index) => {
-                         const name = `q-${index}`;
-                         switch (q.type) {
-                            case 'name': return `<div class="mb-6"><label class="block text-md font-medium text-gray-700 mb-2">${q.text}</label><input type="text" name="${name}" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="請輸入您的姓名" required></div>`;
-                            case 'star': return `<div class="mb-8"><label class="block text-md font-medium text-gray-700 mb-3">${q.text}</label><div class="star-rating flex flex-row-reverse justify-end"><input type="radio" id="${name}-5" name="${name}" value="5" required><label for="${name}-5">★</label><input type="radio" id="${name}-4" name="${name}" value="4"><label for="${name}-4">★</label><input type="radio" id="${name}-3" name="${name}" value="3"><label for="${name}-3">★</label><input type="radio" id="${name}-2" name="${name}" value="2"><label for="${name}-2">★</label><input type="radio" id="${name}-1" name="${name}" value="1"><label for="${name}-1">★</label></div></div>`;
-                            case 'yesno': return `<div class="mb-6"><label class="block text-md font-medium text-gray-700 mb-3">${q.text}</label><div class="flex items-center space-x-4"><input type="radio" id="${name}-yes" name="${name}" value="是" class="h-4 w-4 text-blue-600" required><label for="${name}-yes">是</label><input type="radio" id="${name}-no" name="${name}" value="否" class="h-4 w-4 text-blue-600"><label for="${name}-no">否</label><input type="radio" id="${name}-neutral" name="${name}" value="無意見" class="h-4 w-4 text-blue-600"><label for="${name}-neutral">無意見</label></div></div>`;
-                            case 'text': return `<div class="mb-6"><label class="block text-md font-medium text-gray-700 mb-2">${q.text}</label><textarea name="${name}" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></textarea></div>`;
-                            case 'textarea': return `<div class="mt-8 border-t pt-6"><label class="block text-md font-medium text-gray-700 mb-2">${q.text}</label><textarea name="${name}" rows="5" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></textarea></div>`;
-                            default: return '';
-                         }
-                    }).join('');
+                publicFormContainer.innerHTML = `
+                    <div class="bg-white p-6 rounded-2xl shadow-lg">
+                        <div class="text-center mb-6"><h2 class="text-2xl font-bold">${data.topic}</h2><p class="text-md text-gray-600 mt-1">分享會回饋表單</p></div>
+                        <form id="public-feedback-form">${questionsHtml}<div class="mt-8 text-center"><button type="submit" class="w-full sm:w-auto px-10 py-3 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700">提交回饋</button></div></form>
+                    </div>`;
+                document.body.appendChild(publicFormContainer);
 
-                    publicFormContainer.innerHTML = `
-                        <div class="bg-white p-6 rounded-2xl shadow-lg">
-                            <div class="text-center mb-6">
-                                <h2 class="text-2xl font-bold">${data.topic}</h2>
-                                <p class="text-md text-gray-600 mt-1">分享會回饋表單</p>
-                            </div>
-                            <form id="public-feedback-form">
-                                ${questionsHtml}
-                                <div class="mt-8 text-center">
-                                    <button type="submit" class="w-full sm:w-auto px-10 py-3 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700">提交回饋</button>
-                                </div>
-                            </form>
-                        </div>`;
-                    
-                    document.body.appendChild(publicFormContainer);
-
-                    // 為公開表單加上提交邏輯
-                    document.getElementById('public-feedback-form').addEventListener('submit', async (e) => {
-                        e.preventDefault();
-                        const formData = new FormData(e.target);
-                        const submissionData = {
-                            sessionTopic: data.topic,
-                            sessionId: formId, // 用發布的表單 ID 作為 sessionId
-                            submittedAt: serverTimestamp(),
-                            responses: data.questions.map((q, index) => ({
-                                question: q.text,
-                                answer: formData.get(`q-${index}`) || ''
-                            }))
-                        };
-                        try {
-                            await addDoc(collection(db, `artifacts/${appId}/public/data/feedbackSubmissions`), submissionData);
-                            publicFormContainer.innerHTML = `<div class="bg-white p-10 rounded-2xl shadow-lg text-center"><h2 class="text-2xl font-bold text-green-600">提交成功！</h2><p class="mt-2 text-gray-600">感謝您的寶貴回饋。</p></div>`;
-                        } catch (err) {
-                            publicFormContainer.innerHTML = `<div class="bg-white p-10 rounded-2xl shadow-lg text-center"><h2 class="text-2xl font-bold text-red-600">提交失敗</h2><p class="mt-2 text-gray-600">抱歉，發生錯誤，請稍後再試。</p></div>`;
-                        }
-                    });
-
-                } else {
-                    document.body.innerHTML = `<div class="text-center p-10"><h1 class="text-2xl font-bold text-red-600">找不到表單</h1><p class="mt-2 text-gray-600">此回饋表單的連結可能已失效或不存在。</p></div>`;
-                }
+                document.getElementById('public-feedback-form').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const formData = new FormData(e.target);
+                    const submissionData = {
+                        sessionTopic: data.topic,
+                        sessionId: formId,
+                        submittedAt: serverTimestamp(),
+                        responses: data.questions.map((q, index) => ({
+                            question: q.text,
+                            answer: formData.get(`q-${index}`) || ''
+                        }))
+                    };
+                    try {
+                        await addDoc(collection(db, `artifacts/${appId}/public/data/feedbackSubmissions`), submissionData);
+                        publicFormContainer.innerHTML = `<div class="bg-white p-10 rounded-2xl shadow-lg text-center"><h2 class="text-2xl font-bold text-green-600">提交成功！</h2><p class="mt-2 text-gray-600">感謝您的寶貴回饋。</p></div>`;
+                    } catch (err) {
+                        publicFormContainer.innerHTML = `<div class="bg-white p-10 rounded-2xl shadow-lg text-center"><h2 class="text-2xl font-bold text-red-600">提交失敗</h2><p class="mt-2 text-gray-600">抱歉，發生錯誤，請稍後再試。</p></div>`;
+                    }
+                });
             } catch (error) {
                 console.error("Error loading public form:", error);
                 document.body.innerHTML = `<div class="text-center p-10"><h1 class="text-2xl font-bold text-red-600">載入錯誤</h1><p class="mt-2 text-gray-600">無法載入此回饋表單。</p></div>`;
             }
         }
+        
         // --- Admin View Logic ---
-        // --- Admin View Logic --- (全新版本)
         async function loadAndRenderStats() {
             if (!db) {
                 statsContainer.innerHTML = '<p class="text-center text-red-500">資料庫未連接。</p>';
                 return;
             }
             statsContainer.innerHTML = '<p class="text-center text-gray-500">正在載入數據...</p>';
-            
             const feedbackQuery = query(collection(db, `artifacts/${appId}/public/data/feedbackSubmissions`));
             onSnapshot(feedbackQuery, (querySnapshot) => {
                 const submissions = [];
                 querySnapshot.forEach((doc) => submissions.push({ id: doc.id, ...doc.data() }));
-                
                 if (submissions.length === 0) {
                     statsContainer.innerHTML = '<p class="text-center text-gray-500">目前沒有任何回饋資料。</p>';
                     return;
                 }
-
-                // *** 核心修改：改用 sessionTopic 來分組 ***
                 const sessions = submissions.reduce((acc, sub) => {
                     const topic = sub.sessionTopic;
-                    if (!topic) return acc; // 忽略沒有主題的回饋
-
-                    if (!acc[topic]) {
-                        acc[topic] = { topic: topic, submissions: [] };
-                    }
+                    if (!topic) return acc;
+                    if (!acc[topic]) acc[topic] = { topic: topic, submissions: [] };
                     acc[topic].submissions.push(sub);
                     return acc;
                 }, {});
-
-                renderStats(sessions); // 將分組好的數據傳給渲染函式
+                renderStats(sessions);
             }, (error) => {
                 console.error("Error fetching stats:", error);
                 statsContainer.innerHTML = '<p class="text-center text-red-500">讀取資料時發生錯誤。</p>';
             });
         }
 
-// --- 全新、美化的 renderStats 函式 --- (修正版)
         function renderStats(sessions) {
-            statsContainer.innerHTML = ''; 
-
-            if (!window.activeCharts) {
-                window.activeCharts = new Map();
+            statsContainer.innerHTML = '';
+            if (window.activeCharts) {
+                window.activeCharts.forEach(chart => chart.destroy());
             }
-            window.activeCharts.forEach((chart) => chart.destroy());
-            window.activeCharts.clear();
+            window.activeCharts = new Map();
 
-            Object.values(sessions).forEach((sessionData) => { // 改用 Object.values
+            Object.values(sessions).forEach((sessionData) => {
                 const subCount = sessionData.submissions.length;
-                if (subCount === 0) return; 
-
+                if (subCount === 0) return;
                 const card = document.createElement('div');
                 card.className = 'bg-white p-6 rounded-2xl shadow-lg mb-8';
-                const sessionId = sessionData.submissions[0].id; // 用第一個 submission 的 id 當作圖表的唯一識別
+                const cardId = sessionData.submissions[0].id;
 
-                // --- 資料處理 ---
-                const standardQuestions = ['整體而言，您對這次的分享會滿意度如何？', '分享會的內容對您的工作或學習是否有幫助？', '講者的表達是否清晰易懂？', '您認為分享會的內容在實務上應用的可能性高嗎？'];
+                const standardQuestions = ['1. 整體而言，您對這次的分享會滿意度如何？', '2. 分享會的內容對您的工作或學習是否有幫助？', '3. 講者的表達是否清晰易懂？', '4. 您認為分享會的內容在實務上應用的可能性高嗎？'];
                 const ratingLabels = ['整體滿意度', '內容幫助', '表達清晰', '實務應用'];
-                
-                let chartsHtml = '';
-                let legendsHtml = '';
 
-                ratingLabels.forEach((label, index) => {
+                const statsHtml = ratingLabels.map((label, index) => {
                     const questionText = standardQuestions[index];
-                    const counts = [0, 0, 0, 0, 0]; // 1星到5星
+                    const counts = [0, 0, 0, 0, 0];
                     sessionData.submissions.forEach(sub => {
                         const response = (sub.responses || []).find(r => r.question === questionText);
-                        const score = response ? parseInt(response.answer, 10) : 0;
+                        const score = response ? parseInt(response.answer) : 0;
                         if (score >= 1 && score <= 5) counts[score - 1]++;
                     });
 
-                    chartsHtml += `<div class="relative"><canvas id="chart-${sessionId}-${index}"></canvas><span class="absolute inset-0 flex items-center justify-center text-2xl font-bold text-gray-700">${subCount}<span class="text-xs font-normal ml-1">份</span></span></div>`;
-                    
                     const legendItems = counts.map((count, i) => {
                         const percentage = subCount > 0 ? ((count / subCount) * 100).toFixed(0) : 0;
                         return `<li class="flex items-center justify-between text-sm"><div class="flex items-center"><span class="w-3 h-3 rounded-full mr-2" style="background-color: ${CHART_COLORS[i]};"></span>${i + 1} 星</div><div class="font-medium text-gray-600">${percentage}%</div></li>`;
                     }).reverse().join('');
 
-                    legendsHtml += `<div class="flex flex-col">
-                        <h4 class="font-semibold text-gray-800 mb-2 text-center">${label}</h4>
-                        <ul class="space-y-1">${legendItems}</ul>
-                    </div>`;
-                });
+                    return `
+                        <div class="flex flex-col">
+                            <h4 class="font-semibold text-gray-800 mb-2 text-center">${label}</h4>
+                            <div class="relative mx-auto w-32 h-32">
+                                <canvas id="chart-${cardId}-${index}"></canvas>
+                                <span class="absolute inset-0 flex items-center justify-center text-2xl font-bold text-gray-700">${subCount}<span class="text-xs font-normal ml-1">份</span></span>
+                            </div>
+                            <ul class="space-y-1 mt-4">${legendItems}</ul>
+                        </div>`;
+                }).join('');
 
-                // --- 處理文字回饋 (姓名、部門、建議) ---
                 const commentsHtml = sessionData.submissions.map(sub => {
                     const name = (sub.responses.find(r => r.question === "您的姓名：") || {}).answer || '匿名';
                     const department = (sub.responses.find(r => r.question === "您的部門：") || {}).answer || '未提供';
                     const comment = (sub.responses.find(r => r.question === "其他建議或回饋：") || {}).answer || '';
-                    
-                    if (!comment.trim()) return ''; // 如果沒有建議，就不顯示
+                    if (!comment.trim()) return null;
+                    return `<li class="border-b py-2 text-sm"><p><strong>${name}</strong> <span class="text-gray-500">(${department})</span></p><p class="mt-1">${comment}</p></li>`;
+                }).filter(Boolean).join('');
 
-                    return `<li class="border-b py-2 text-sm">
-                                <p><strong>${name}</strong> <span class="text-gray-500">(${department})</span></p>
-                                <p class="mt-1">${comment}</p>
-                           </li>`;
-                }).join('');
-
-                // --- 組合卡片 ---
                 card.innerHTML = `
                     <h2 class="text-xl font-bold text-gray-900">${sessionData.topic}</h2>
                     <p class="text-sm text-gray-500 mb-6">總共 ${subCount} 份回饋</p>
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-6">
-                        ${legendsHtml}
-                    </div>
-                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-6">${statsHtml}</div>
                     <div class="mt-6">
                         <h3 class="text-md font-semibold mt-4 mb-2">其他建議：</h3>
                         <ul class="bg-gray-50 p-3 rounded-lg max-h-40 overflow-y-auto">${commentsHtml || '<li class="text-gray-400 text-sm">暫無文字回饋</li>'}</ul>
-                    </div>
-                `;
+                    </div>`;
                 statsContainer.appendChild(card);
                 
-                // 繪製圖表
                 setTimeout(() => {
                    ratingLabels.forEach((label, index) => {
-                        const ctx = document.getElementById(`chart-${sessionId}-${index}`);
+                        const ctx = document.getElementById(`chart-${cardId}-${index}`);
                         const questionText = standardQuestions[index];
                         const counts = [0, 0, 0, 0, 0];
                         sessionData.submissions.forEach(sub => {
                              const response = (sub.responses || []).find(r => r.question === questionText);
-                             const score = response ? parseInt(response.answer, 10) : 0;
+                             const score = response ? parseInt(response.answer) : 0;
                              if (score >= 1 && score <= 5) counts[score - 1]++;
                         });
-                        
                         if (ctx) {
                             const chart = new Chart(ctx.getContext('2d'), {
                                 type: 'doughnut',
                                 data: { datasets: [{ data: counts, backgroundColor: CHART_COLORS, borderColor: '#ffffff', borderWidth: 2 }] },
-                                options: { cutout: '80%', responsive: true, plugins: { legend: { display: false }, tooltip: { enabled: false } } }
+                                options: { cutout: '80%', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { enabled: false } } }
                             });
                             window.activeCharts.set(ctx.id, chart);
                         }
@@ -804,6 +535,7 @@ function addQuestion(type) {
                 }, 0);
             });
         }
+        
         // --- UI Control Functions ---
         function setLoading(isLoading) {
             generateBtn.disabled = isLoading;
@@ -812,58 +544,62 @@ function addQuestion(type) {
         }
         
         function showModal(title, message, isError = false) {
+            const qrContent = document.getElementById('modal-qr-content');
+            modalIconContainer.classList.remove('hidden');
+            qrContent.classList.add('hidden');
             modalTitle.textContent = title;
             modalMessage.textContent = message;
+            
             if (isError) {
                 modalIconContainer.className = 'mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100';
-                modalIconContainer.innerHTML = `<svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+                modalIconContainer.innerHTML = `<svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
             } else {
                 modalIconContainer.className = 'mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100';
-                modalIconContainer.innerHTML = `<svg class="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`;
+                modalIconContainer.innerHTML = `<svg class="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`;
             }
             messageModal.classList.remove('hidden');
             messageModal.classList.add('flex');
         }
 
-        // --- Gemini API Call ---
-        async function getCustomQuestions(topic, summary, fileContent) {
-            const prompt = `你是一個活動問卷設計專家。請根據以下 AI 分享會的資訊，設計 2 個最相關、最能評估學習成效的封閉式問題（是/否/無意見）。主題：${topic} 內容摘要：${summary} ${fileContent ? `補充文件內容：\n${fileContent.substring(0, 3000)}` : ''} 請確保問題簡潔明瞭，並以繁體中文回答。`;
-            const payload = {
-                contents: [{ role: "user", parts: [{ text: prompt }] }],
-                generationConfig: {
-                    responseMimeType: "application/json",
-                    responseSchema: { type: "OBJECT", properties: { questions: { type: "ARRAY", items: { type: "OBJECT", properties: { question: { type: "STRING" } }, required: ["question"] }}}, required: ["questions"] }
-                }
-            };
-            const apiKey = "AIzaSyCzcmwDI54y2nBsnoWgmFhSddgrvw35FHQ";
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-            try {
-                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                if (!response.ok) throw new Error(`API request failed with status ${response.status}`);
-                const result = await response.json();
-                const jsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
-                return JSON.parse(jsonText).questions || [];
-            } catch (error) {
-                console.error("Gemini API call failed:", error);
-                // Re-throw the error to be caught by the calling function
-                throw error;
-            }
+        function showQrCodeModal(url) {
+            const qrContainer = document.getElementById('qrcode');
+            const linkInput = document.getElementById('form-link');
+            const qrContent = document.getElementById('modal-qr-content');
+            
+            modalTitle.textContent = '發布成功！';
+            modalMessage.textContent = '任何人都可以透過此連結或 QR Code 填寫回饋。';
+            qrContainer.innerHTML = '';
+            
+            const qr = qrcode(0, 'L');
+            qr.addData(url);
+            qr.make();
+            qrContainer.innerHTML = qr.createImgTag(5, 2);
+
+            linkInput.value = url;
+            qrContent.classList.remove('hidden');
+            modalIconContainer.classList.add('hidden');
+            
+            messageModal.classList.remove('hidden');
+            messageModal.classList.add('flex');
         }
 
-// --- Initial Load ---
+        // --- Gemini API Call (Currently Disabled) ---
+        async function getCustomQuestions(topic, summary, fileContent) {
+            // AI 功能已停用，直接返回空陣列
+            console.log("AI question generation is disabled. Returning empty array.");
+            return Promise.resolve([]);
+        }
+
+        // --- Initial Load ---
         document.addEventListener('DOMContentLoaded', () => {
             const urlParams = new URLSearchParams(window.location.search);
             const formId = urlParams.get('formId');
-
             if (formId) {
-                // 如果網址有 formId，就載入公開表單
                 loadAndRenderPublicForm(formId);
             } else {
-                // 否則，走正常的管理員/使用者流程
                 initializeFirebase();
             }
         });
-
     </script>
 </body>
-</ht
+</html>
