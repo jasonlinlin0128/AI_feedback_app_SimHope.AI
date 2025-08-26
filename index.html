@@ -124,7 +124,7 @@
 
         // --- IMPORTANT: Firebase Config ---
         // 請將此處的範例設定替換成您自己 Firebase 專案的實際設定。
-       const firebaseConfig = {
+        const firebaseConfig = {
   apiKey: "AIzaSyCbRwvK7guh61K9kp2QqTrEOE7nuEXIzPg",
   authDomain: "ai-feedback-app-simhope-ai.firebaseapp.com",
   projectId: "ai-feedback-app-simhope-ai",
@@ -140,6 +140,7 @@
         rules_version = '2';
         service cloud.firestore {
           match /databases/{database}/documents {
+            // This path now correctly matches the code's path
             match /artifacts/{appId}/public/data/feedbackSubmissions/{submissionId} {
               allow read, create: if true;
             }
@@ -339,7 +340,7 @@
             });
             try {
                 // **FIXED**: Corrected the collection path to have an odd number of segments.
-                await addDoc(collection(db, `/artifacts/${appId}/public/data/feedbackSubmissions`), data);
+                await addDoc(collection(db, `artifacts/${appId}/public/data/feedbackSubmissions`), data);
                 showModal('提交成功！', '感謝您的寶貴回饋。');
                 form.reset();
             } catch (error) {
@@ -356,7 +357,7 @@
             }
             statsContainer.innerHTML = '<p class="text-center text-gray-500">正在載入數據...</p>';
             // **FIXED**: Corrected the collection path to match the submission path.
-            const feedbackQuery = query(collection(db, `/artifacts/${appId}/public/data/feedbackSubmissions`));
+            const feedbackQuery = query(collection(db, `artifacts/${appId}/public/data/feedbackSubmissions`));
             onSnapshot(feedbackQuery, (querySnapshot) => {
                 const submissions = [];
                 querySnapshot.forEach((doc) => submissions.push({ id: doc.id, ...doc.data() }));
@@ -442,4 +443,4 @@
 
     </script>
 </body>
-</html>
+</ht
