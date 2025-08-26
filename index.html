@@ -228,7 +228,7 @@
                 generatorView.classList.add('hidden');
                 adminView.classList.remove('hidden');
                 toggleViewBtn.textContent = '返回表單生成器';
-                loadAnd(); // 載入數據
+                loadAndRenderStats(); // 載入數據
             }
             // 與會者維持不變，預設顯示生成器畫面
         }
@@ -262,7 +262,7 @@
                 generatorView.classList.add('hidden');
                 adminView.classList.remove('hidden');
                 toggleViewBtn.textContent = '返回表單生成器';
-                loadAnd();
+                loadAndRenderStats();
             }
         }
 
@@ -330,10 +330,14 @@
             
             formOutput.innerHTML = `<div class="text-center mb-6"><h2 class="text-2xl font-bold">${topic}</h2><p class="text-md text-gray-600 mt-1">分享會回饋表單</p></div>
             <form id="feedback-form" data-session-id="${sessionId}" data-session-topic="${topic}">
-                <div class="mb-8">
+                <div class="mb-6">
                     <label for="submitter-name" class="block text-md font-medium text-gray-700 mb-2">您的姓名：</label>
                     <input type="text" id="submitter-name" name="submitter-name" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="請輸入您的姓名" required>
                 </div>
+                <div class="mb-8">
+        <label for="submitter-department" class="block text-md font-medium text-gray-700 mb-2">您的部門：</label>
+        <input type="text" id="submitter-department" name="submitter-department" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="請輸入您的部門" required>
+    </div>
                 ${standardQuestions.map(q => `<div class="mb-8"><label class="block text-md font-medium text-gray-700 mb-3">${q.text}</label><div class="star-rating flex flex-row-reverse justify-end"><input type="radio" id="${q.id}-5" name="${q.id}" value="5" required><label for="${q.id}-5">★</label><input type="radio" id="${q.id}-4" name="${q.id}" value="4"><label for="${q.id}-4">★</label><input type="radio" id="${q.id}-3" name="${q.id}" value="3"><label for="${q.id}-3">★</label><input type="radio" id="${q.id}-2" name="${q.id}" value="2"><label for="${q.id}-2">★</label><input type="radio" id="${q.id}-1" name="${q.id}" value="1"><label for="${q.id}-1">★</label></div></div>`).join('')}
                 
                 <div id="editable-questions-container">${customQuestionsHtml}</div>
@@ -422,6 +426,7 @@ function addQuestion(type) {
             nextQuestionNumber++; // 題號加 1，為下一個問題做準備
         }
 // --- Data Handling (Firebase) ---
+        // --- Data Handling (Firebase) --- (全新版本)
         async function handleFormSubmit(e) {
             e.preventDefault();
             if (!db) {
@@ -430,52 +435,53 @@ function addQuestion(type) {
             }
             const form = e.target;
             const formData = new FormData(form);
+            
+            const responses = [];
+            // 手動收集所有欄位的問與答
+            responses.push({ question: "您的姓名：", answer: formData.get('submitter-name') });
+            responses.push({ question: "您的部門：", answer: formData.get('submitter-department') });
+
+            // 收集標準問題
+            form.querySelectorAll('.star-rating').forEach(div => {
+                const label = div.previousElementSibling;
+                const question = label.textContent;
+                const answer = formData.get(div.querySelector('input').name);
+                responses.push({ question, answer: answer ? `${answer} 星` : '' });
+            });
+
+            // 收集 AI 和手動問題
+             form.querySelectorAll('#editable-questions-container .mb-6, #editable-questions-container .mb-8').forEach(div => {
+                const questionInput = div.querySelector('.manual-question-input');
+                let question = questionInput ? questionInput.value : div.querySelector('label').dataset.questionText;
+
+                const questionType = div.dataset.type || 'yesno';
+                const inputs = div.querySelectorAll('input[type="radio"], textarea');
+                let answer = '';
+                if (questionType === 'text') {
+                    answer = inputs[inputs.length - 1].value;
+                } else {
+                    const checkedRadio = Array.from(inputs).find(radio => radio.checked);
+                    answer = checkedRadio ? checkedRadio.value : '';
+                }
+                if (question) responses.push({ question, answer });
+            });
+
+            // 收集其他建議
+            responses.push({ question: "其他建議或回饋：", answer: formData.get('feedback-comments') });
+
             const data = {
                 sessionId: form.dataset.sessionId,
                 sessionTopic: form.dataset.sessionTopic,
                 submittedAt: serverTimestamp(),
-                submitterName: formData.get('submitter-name'),
-                ratings: {},
-                customResponses: [],
-                manualResponses: [], // 新增一個陣列來儲存手動新增的問題
-                comments: formData.get('feedback-comments')
+                responses: responses // 使用統一的 responses 陣列
             };
-
-            // 處理標準問題
-            ['overall-satisfaction', 'content-relevance', 'speaker-clarity', 'practicality'].forEach(id => {
-                data.ratings[id] = parseInt(formData.get(id), 10);
-            });
-
-            // 處理 AI 生成的是非題
-            form.querySelectorAll('[data-question-text]').forEach((label, index) => {
-                const question = label.dataset.questionText;
-                const answer = formData.get(`custom-${index}`);
-                if (question && answer) data.customResponses.push({ question, answer });
-            });
-            
-            // 處理手動新增的問題
-            form.querySelectorAll('.manual-question').forEach(questionDiv => {
-                const question = questionDiv.querySelector('.manual-question-input').value;
-                const questionType = questionDiv.dataset.type;
-                const inputs = questionDiv.querySelectorAll('input[type="radio"], textarea');
-                let answer = '';
-                if (questionType === 'text') {
-                    answer = inputs[0].value;
-                } else { // star or yesno
-                    const checkedRadio = Array.from(inputs).find(radio => radio.checked);
-                    answer = checkedRadio ? checkedRadio.value : '';
-                }
-                if (question) data.manualResponses.push({ question, answer, type: questionType });
-            });
-
 
             try {
                 await addDoc(collection(db, `artifacts/${appId}/public/data/feedbackSubmissions`), data);
                 showModal('提交成功！', '感謝您的寶貴回饋。');
                 form.reset();
-                formOutput.innerHTML = ''; // 清空表單
+                formOutput.innerHTML = '';
                 formOutput.classList.add('hidden');
-
             } catch (error) {
                 console.error("Error adding document: ", error);
                 showModal('提交失敗', '無法將您的回饋儲存至資料庫，請稍後再試。', true);
@@ -643,115 +649,103 @@ function addQuestion(type) {
             }
         }
         // --- Admin View Logic ---
-        async function loadAnd() {
+        // --- Admin View Logic --- (全新版本)
+        async function loadAndRenderStats() {
             if (!db) {
                 statsContainer.innerHTML = '<p class="text-center text-red-500">資料庫未連接。</p>';
                 return;
             }
             statsContainer.innerHTML = '<p class="text-center text-gray-500">正在載入數據...</p>';
-            // **FIXED**: Corrected the collection path to match the submission path.
+            
             const feedbackQuery = query(collection(db, `artifacts/${appId}/public/data/feedbackSubmissions`));
             onSnapshot(feedbackQuery, (querySnapshot) => {
                 const submissions = [];
                 querySnapshot.forEach((doc) => submissions.push({ id: doc.id, ...doc.data() }));
+                
                 if (submissions.length === 0) {
                     statsContainer.innerHTML = '<p class="text-center text-gray-500">目前沒有任何回饋資料。</p>';
                     return;
                 }
+
+                // *** 核心修改：改用 sessionTopic 來分組 ***
                 const sessions = submissions.reduce((acc, sub) => {
-                    const { sessionId, sessionTopic } = sub;
-                    if (!acc[sessionId]) acc[sessionId] = { topic: sessionTopic, submissions: [] };
-                    acc[sessionId].submissions.push(sub);
+                    const topic = sub.sessionTopic;
+                    if (!topic) return acc; // 忽略沒有主題的回饋
+
+                    if (!acc[topic]) {
+                        acc[topic] = { topic: topic, submissions: [] };
+                    }
+                    acc[topic].submissions.push(sub);
                     return acc;
                 }, {});
-                renderStats(sessions);
+
+                renderStats(sessions); // 將分組好的數據傳給渲染函式
             }, (error) => {
                 console.error("Error fetching stats:", error);
                 statsContainer.innerHTML = '<p class="text-center text-red-500">讀取資料時發生錯誤。</p>';
             });
         }
 
-// --- 全新、美化的 renderStats 函式 ---
+// --- 全新、美化的 renderStats 函式 --- (修正版)
         function renderStats(sessions) {
-            statsContainer.innerHTML = ''; // 每次都先清空容器
+            statsContainer.innerHTML = ''; 
 
-            // 用來追蹤已初始化的 Chart.js 實例
             if (!window.activeCharts) {
                 window.activeCharts = new Map();
             }
-
-            // 銷毀舊的圖表實例
-            window.activeCharts.forEach((chart) => {
-                chart.destroy();
-            });
+            window.activeCharts.forEach((chart) => chart.destroy());
             window.activeCharts.clear();
 
-            Object.entries(sessions).forEach(([sessionId, sessionData]) => {
+            Object.values(sessions).forEach((sessionData) => { // 改用 Object.values
                 const subCount = sessionData.submissions.length;
-                if (subCount === 0) return; // 如果沒有回饋，則不顯示卡片
+                if (subCount === 0) return; 
 
                 const card = document.createElement('div');
                 card.className = 'bg-white p-6 rounded-2xl shadow-lg mb-8';
+                const sessionId = sessionData.submissions[0].id; // 用第一個 submission 的 id 當作圖表的唯一識別
 
                 // --- 資料處理 ---
-                const ratingIds = ['overall-satisfaction', 'content-relevance', 'speaker-clarity', 'practicality'];
+                const standardQuestions = ['整體而言，您對這次的分享會滿意度如何？', '分享會的內容對您的工作或學習是否有幫助？', '講者的表達是否清晰易懂？', '您認為分享會的內容在實務上應用的可能性高嗎？'];
                 const ratingLabels = ['整體滿意度', '內容幫助', '表達清晰', '實務應用'];
                 
                 let chartsHtml = '';
                 let legendsHtml = '';
 
-                ratingIds.forEach((id, index) => {
+                ratingLabels.forEach((label, index) => {
+                    const questionText = standardQuestions[index];
                     const counts = [0, 0, 0, 0, 0]; // 1星到5星
                     sessionData.submissions.forEach(sub => {
-                        const score = sub.ratings[id];
+                        const response = (sub.responses || []).find(r => r.question === questionText);
+                        const score = response ? parseInt(response.answer, 10) : 0;
                         if (score >= 1 && score <= 5) counts[score - 1]++;
                     });
 
-                    // 準備圖表和圖例的 HTML
-                    chartsHtml += `<div class="relative"><canvas id="chart-${sessionId}-${id}"></canvas><span class="absolute inset-0 flex items-center justify-center text-2xl font-bold text-gray-700">${subCount}<span class="text-xs font-normal ml-1">份</span></span></div>`;
+                    chartsHtml += `<div class="relative"><canvas id="chart-${sessionId}-${index}"></canvas><span class="absolute inset-0 flex items-center justify-center text-2xl font-bold text-gray-700">${subCount}<span class="text-xs font-normal ml-1">份</span></span></div>`;
                     
                     const legendItems = counts.map((count, i) => {
-                        const percentage = ((count / subCount) * 100).toFixed(0);
+                        const percentage = subCount > 0 ? ((count / subCount) * 100).toFixed(0) : 0;
                         return `<li class="flex items-center justify-between text-sm"><div class="flex items-center"><span class="w-3 h-3 rounded-full mr-2" style="background-color: ${CHART_COLORS[i]};"></span>${i + 1} 星</div><div class="font-medium text-gray-600">${percentage}%</div></li>`;
-                    }).reverse().join(''); // reverse 讓5星在最上面
+                    }).reverse().join('');
 
                     legendsHtml += `<div class="flex flex-col">
-                        <h4 class="font-semibold text-gray-800 mb-2 text-center">${ratingLabels[index]}</h4>
+                        <h4 class="font-semibold text-gray-800 mb-2 text-center">${label}</h4>
                         <ul class="space-y-1">${legendItems}</ul>
                     </div>`;
                 });
 
-                // --- 處理其他問題 (這部分邏輯不變) ---
-                const questionStats = {};
-                 sessionData.submissions.forEach(sub => {
-                    (sub.customResponses || []).forEach(res => {
-                        if (!questionStats[res.question]) { questionStats[res.question] = { type: 'yesno', answers: {} }; }
-                        questionStats[res.question].answers[res.answer] = (questionStats[res.question].answers[res.answer] || 0) + 1;
-                    });
-                    (sub.manualResponses || []).forEach(res => {
-                        if (!questionStats[res.question]) { questionStats[res.question] = { type: res.type, answers: res.type === 'text' ? [] : {} }; }
-                        if (res.type === 'text') { questionStats[res.question].answers.push(res.answer); }
-                        else if (res.type === 'star') {
-                            let current = questionStats[res.question].answers;
-                            current.totalScore = (current.totalScore || 0) + parseInt(res.answer, 10);
-                            current.count = (current.count || 0) + 1;
-                        } else {
-                            questionStats[res.question].answers[res.answer] = (questionStats[res.question].answers[res.answer] || 0) + 1;
-                        }
-                    });
-                });
-                let questionStatsHtml = Object.entries(questionStats).map(([question, stats]) => {
-                    let answersHtml = '';
-                    if (stats.type === 'yesno') { answersHtml = Object.entries(stats.answers).map(([answer, count]) => `<span class="mr-4">${answer}: <strong>${count}</strong></span>`).join(''); }
-                    else if (stats.type === 'star') { const average = (stats.answers.totalScore / stats.answers.count).toFixed(1); answersHtml = `平均分數: <strong class="text-lg">${average}</strong> / 5`; }
-                    else if (stats.type === 'text') {
-                        answersHtml = stats.answers.map(answer => `<li class="text-sm text-gray-600 border-b py-1">${answer}</li>`).join('');
-                        return `<div class="py-2"><p class="font-semibold text-gray-800">${question}</p><ul class="mt-1 list-disc list-inside">${answersHtml}</ul></div>`;
-                    }
-                    return `<div class="py-2"><p class="font-semibold text-gray-800">${question}</p><div class="text-sm text-gray-600 mt-1">${answersHtml}</div></div>`;
+                // --- 處理文字回饋 (姓名、部門、建議) ---
+                const commentsHtml = sessionData.submissions.map(sub => {
+                    const name = (sub.responses.find(r => r.question === "您的姓名：") || {}).answer || '匿名';
+                    const department = (sub.responses.find(r => r.question === "您的部門：") || {}).answer || '未提供';
+                    const comment = (sub.responses.find(r => r.question === "其他建議或回饋：") || {}).answer || '';
+                    
+                    if (!comment.trim()) return ''; // 如果沒有建議，就不顯示
+
+                    return `<li class="border-b py-2 text-sm">
+                                <p><strong>${name}</strong> <span class="text-gray-500">(${department})</span></p>
+                                <p class="mt-1">${comment}</p>
+                           </li>`;
                 }).join('');
-                if (questionStatsHtml) { questionStatsHtml = `<div class="mt-6 border-t pt-4"><h3 class="text-md font-semibold mb-2">自訂問題回饋：</h3><div class="space-y-2">${questionStatsHtml}</div></div>`; }
-                const commentsHtml = sessionData.submissions.filter(s => s.comments && s.comments.trim() !== '').map(s => `<li class="border-b py-2 text-sm"><strong>${s.submitterName || '匿名'}：</strong> ${s.comments}</li>`).join('');
 
                 // --- 組合卡片 ---
                 card.innerHTML = `
@@ -760,7 +754,7 @@ function addQuestion(type) {
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-6">
                         ${legendsHtml}
                     </div>
-                    ${questionStatsHtml}
+                    
                     <div class="mt-6">
                         <h3 class="text-md font-semibold mt-4 mb-2">其他建議：</h3>
                         <ul class="bg-gray-50 p-3 rounded-lg max-h-40 overflow-y-auto">${commentsHtml || '<li class="text-gray-400 text-sm">暫無文字回饋</li>'}</ul>
@@ -768,44 +762,30 @@ function addQuestion(type) {
                 `;
                 statsContainer.appendChild(card);
                 
-                 // 繪製新的甜甜圈圖
+                // 繪製圖表
                 setTimeout(() => {
-                    ratingIds.forEach(id => {
-                        const ctx = document.getElementById(`chart-${sessionId}-${id}`);
+                   ratingLabels.forEach((label, index) => {
+                        const ctx = document.getElementById(`chart-${sessionId}-${index}`);
+                        const questionText = standardQuestions[index];
                         const counts = [0, 0, 0, 0, 0];
                         sessionData.submissions.forEach(sub => {
-                            const score = sub.ratings[id];
-                            if (score >= 1 && score <= 5) counts[score - 1]++;
+                             const response = (sub.responses || []).find(r => r.question === questionText);
+                             const score = response ? parseInt(response.answer, 10) : 0;
+                             if (score >= 1 && score <= 5) counts[score - 1]++;
                         });
-
+                        
                         if (ctx) {
                             const chart = new Chart(ctx.getContext('2d'), {
                                 type: 'doughnut',
-                                data: {
-                                    datasets: [{
-                                        data: counts,
-                                        backgroundColor: CHART_COLORS,
-                                        borderColor: '#ffffff',
-                                        borderWidth: 2,
-                                        hoverOffset: 4
-                                    }]
-                                },
-                                options: {
-                                    cutout: '80%',
-                                    responsive: true,
-                                    plugins: {
-                                        legend: { display: false },
-                                        tooltip: { enabled: false }
-                                    }
-                                }
+                                data: { datasets: [{ data: counts, backgroundColor: CHART_COLORS, borderColor: '#ffffff', borderWidth: 2 }] },
+                                options: { cutout: '80%', responsive: true, plugins: { legend: { display: false }, tooltip: { enabled: false } } }
                             });
-                            window.activeCharts.set(ctx.id, chart); // 儲存圖表實例
+                            window.activeCharts.set(ctx.id, chart);
                         }
                     });
                 }, 0);
             });
         }
-
         // --- UI Control Functions ---
         function setLoading(isLoading) {
             generateBtn.disabled = isLoading;
