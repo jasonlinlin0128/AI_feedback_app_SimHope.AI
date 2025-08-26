@@ -119,13 +119,12 @@
     <script type="module">
         // Firebase Imports
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- IMPORTANT: Firebase Config ---
         // 請將此處的範例設定替換成您自己 Firebase 專案的實際設定。
-        // 這個範例是無效的，無法直接運作。
-        const firebaseConfig = {
+       const firebaseConfig = {
   apiKey: "AIzaSyCbRwvK7guh61K9kp2QqTrEOE7nuEXIzPg",
   authDomain: "ai-feedback-app-simhope-ai.firebaseapp.com",
   projectId: "ai-feedback-app-simhope-ai",
@@ -136,20 +135,19 @@
 };
         
         // --- IMPORTANT: Firestore Security Rules ---
-        // 要修正提交失敗的問題，請到您的 Firebase 專案 -> Firestore Database -> Rules
-        // 並用以下規則取代預設規則:
+        // **FIXED**: The path has been corrected. Please update your Firestore rules with this new version.
         /*
         rules_version = '2';
         service cloud.firestore {
           match /databases/{database}/documents {
-            match /artifacts/{appId}/public/feedbackSubmissions/{submissionId} {
+            match /artifacts/{appId}/public/data/feedbackSubmissions/{submissionId} {
               allow read, create: if true;
             }
           }
         }
         */
 
-        const appId = 'default-app-id'; // You can customize this if needed
+        const appId = 'default-app-id';
         let db, auth, userId;
 
         // --- DOM Elements ---
@@ -160,7 +158,6 @@
         const passwordSection = document.getElementById('password-section');
         const passwordInput = document.getElementById('password-input');
         const loginSubmitBtn = document.getElementById('login-submit-btn');
-        
         const generatorView = document.getElementById('generator-view');
         const adminView = document.getElementById('admin-view');
         const toggleViewContainer = document.getElementById('toggle-view-container');
@@ -181,10 +178,9 @@
 
         // --- Firebase Initialization ---
         async function initializeFirebase() {
-            // **FIX**: Validate if the config is still the placeholder before initializing
             if (!firebaseConfig || firebaseConfig.apiKey === "AIzaSyxxxxxxxxxxxxxxxxxxxxxxx") {
                 showModal('設定錯誤', '您尚未設定有效的 Firebase 設定。請將程式碼中的 `firebaseConfig` 物件替換成您從 Firebase 專案中取得的實際設定。', true);
-                return; // Stop initialization if config is invalid
+                return;
             }
 
             try {
@@ -197,7 +193,6 @@
                     } else {
                         signInAnonymously(auth).catch((error) => {
                             console.error("Anonymous sign-in failed:", error);
-                            // **FIX**: Provide a specific user-friendly error for invalid API keys
                             if (error.code === 'auth/api-key-not-valid') {
                                 showModal('Firebase 連線錯誤', '您提供的 Firebase API 金鑰無效。請確認您已將正確的 `firebaseConfig` 貼入程式碼中。', true);
                             } else {
@@ -208,7 +203,6 @@
                 });
             } catch (error) {
                 console.error("Firebase initialization failed:", error);
-                // This catch might handle malformed config objects
                 showModal('Firebase 初始化失敗', '請檢查您的 firebaseConfig 物件格式是否正確。', true);
             }
         }
@@ -222,17 +216,9 @@
             }
         }
 
-        attendeeBtn.addEventListener('click', () => {
-            showAppView(false);
-        });
-
-        managerBtn.addEventListener('click', () => {
-            passwordSection.classList.remove('hidden');
-        });
-
+        attendeeBtn.addEventListener('click', () => { showAppView(false); });
+        managerBtn.addEventListener('click', () => { passwordSection.classList.remove('hidden'); });
         loginSubmitBtn.addEventListener('click', () => {
-            // IMPORTANT: This is a simple, insecure password check for demonstration.
-            // For a real application, use Firebase Authentication.
             if (passwordInput.value === 'admin123') {
                 showAppView(true);
             } else {
@@ -352,7 +338,8 @@
                 if (question && answer) data.customResponses.push({ question, answer });
             });
             try {
-                await addDoc(collection(db, `/artifacts/${appId}/public/feedbackSubmissions`), data);
+                // **FIXED**: Corrected the collection path to have an odd number of segments.
+                await addDoc(collection(db, `/artifacts/${appId}/public/data/feedbackSubmissions`), data);
                 showModal('提交成功！', '感謝您的寶貴回饋。');
                 form.reset();
             } catch (error) {
@@ -368,7 +355,8 @@
                 return;
             }
             statsContainer.innerHTML = '<p class="text-center text-gray-500">正在載入數據...</p>';
-            const feedbackQuery = query(collection(db, `/artifacts/${appId}/public/feedbackSubmissions`));
+            // **FIXED**: Corrected the collection path to match the submission path.
+            const feedbackQuery = query(collection(db, `/artifacts/${appId}/public/data/feedbackSubmissions`));
             onSnapshot(feedbackQuery, (querySnapshot) => {
                 const submissions = [];
                 querySnapshot.forEach((doc) => submissions.push({ id: doc.id, ...doc.data() }));
@@ -444,7 +432,8 @@
                 return JSON.parse(jsonText).questions || [];
             } catch (error) {
                 console.error("Gemini API call failed:", error);
-                return [];
+                // Re-throw the error to be caught by the calling function
+                throw error;
             }
         }
 
