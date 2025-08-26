@@ -150,6 +150,7 @@
 
         const appId = 'default-app-id';
         let db, auth, userId;
+        let nextQuestionNumber = 1; // 新增題號計數器
 
         // --- DOM Elements ---
         const loginView = document.getElementById('login-view');
@@ -316,7 +317,8 @@
             if (customQuestions && customQuestions.length > 0) {
                  customQuestionsHtml = `<div id="ai-questions-container" class="mt-8 border-t pt-6"><h3 class="text-lg font-semibold text-gray-800 mb-4">針對本次主題</h3>${customQuestions.map((q, index) => `<div class="mb-6"><label class="block text-md font-medium text-gray-700 mb-3" data-question-text="${q.question}">${index + 5}. ${q.question}</label><div class="flex items-center space-x-4"><input type="radio" id="custom-${index}-yes" name="custom-${index}" value="是" class="h-4 w-4 text-blue-600" required><label for="custom-${index}-yes">是</label><input type="radio" id="custom-${index}-no" name="custom-${index}" value="否" class="h-4 w-4 text-blue-600"><label for="custom-${index}-no">否</label><input type="radio" id="custom-${index}-neutral" name="custom-${index}" value="無意見" class="h-4 w-4 text-blue-600"><label for="custom-${index}-neutral">無意見</label></div></div>`).join('')}</div>`;
             }
-
+            nextQuestionNumber = standardQuestions.length + (customQuestions ? customQuestions.length : 0) + 1;
+            
             formOutput.innerHTML = `<div class="text-center mb-6"><h2 class="text-2xl font-bold">${topic}</h2><p class="text-md text-gray-600 mt-1">分享會回饋表單</p></div>
             <form id="feedback-form" data-session-id="${sessionId}" data-session-topic="${topic}">
                 <div class="mb-8">
@@ -353,16 +355,21 @@
             document.getElementById('add-text-btn').addEventListener('click', () => addQuestion('text'));
         }
         let manualQuestionCounter = 0;
-        function addQuestion(type) {
+function addQuestion(type) {
             const container = document.getElementById('editable-questions-container');
             const questionId = `manual-${type}-${manualQuestionCounter++}`;
             let questionHtml = '';
+
+            const questionLabel = `<span class="font-semibold text-gray-800 mr-2">${nextQuestionNumber}.</span>`;
 
             switch (type) {
                 case 'star':
                     questionHtml = `
                         <div class="mb-8 manual-question" data-type="star">
-                            <input type="text" placeholder="請在此輸入您的評分問題..." class="w-full px-2 py-1 border border-gray-300 rounded-lg mb-3 manual-question-input" required>
+                            <div class="flex items-center mb-3">
+                                ${questionLabel}
+                                <input type="text" placeholder="請在此輸入您的評分問題..." class="w-full px-2 py-1 border border-gray-300 rounded-lg manual-question-input" required>
+                            </div>
                             <div class="star-rating flex flex-row-reverse justify-end">
                                 <input type="radio" id="${questionId}-5" name="${questionId}" value="5" required><label for="${questionId}-5">★</label>
                                 <input type="radio" id="${questionId}-4" name="${questionId}" value="4"><label for="${questionId}-4">★</label>
@@ -375,7 +382,10 @@
                 case 'yesno':
                     questionHtml = `
                         <div class="mb-6 manual-question" data-type="yesno">
-                            <input type="text" placeholder="請在此輸入您的是非問題..." class="w-full px-2 py-1 border border-gray-300 rounded-lg mb-3 manual-question-input" required>
+                            <div class="flex items-center mb-3">
+                                ${questionLabel}
+                                <input type="text" placeholder="請在此輸入您的是非問題..." class="w-full px-2 py-1 border border-gray-300 rounded-lg manual-question-input" required>
+                            </div>
                             <div class="flex items-center space-x-4">
                                 <input type="radio" id="${questionId}-yes" name="${questionId}" value="是" class="h-4 w-4 text-blue-600" required><label for="${questionId}-yes">是</label>
                                 <input type="radio" id="${questionId}-no" name="${questionId}" value="否" class="h-4 w-4 text-blue-600"><label for="${questionId}-no">否</label>
@@ -386,12 +396,16 @@
                 case 'text':
                     questionHtml = `
                         <div class="mb-8 manual-question" data-type="text">
-                            <input type="text" placeholder="請在此輸入您的簡答問題..." class="w-full px-2 py-1 border border-gray-300 rounded-lg mb-2 manual-question-input" required>
+                            <div class="flex items-center mb-2">
+                                ${questionLabel}
+                                <input type="text" placeholder="請在此輸入您的簡答問題..." class="w-full px-2 py-1 border border-gray-300 rounded-lg manual-question-input" required>
+                            </div>
                             <textarea name="${questionId}" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="回答..."></textarea>
                         </div>`;
                     break;
             }
             container.insertAdjacentHTML('beforeend', questionHtml);
+            nextQuestionNumber++; // 題號加 1，為下一個問題做準備
         }
 // --- Data Handling (Firebase) ---
         async function handleFormSubmit(e) {
@@ -483,17 +497,89 @@
             });
         }
 
-        function renderStats(sessions) {
+function renderStats(sessions) {
             statsContainer.innerHTML = Object.entries(sessions).map(([sessionId, sessionData]) => {
                 const subCount = sessionData.submissions.length;
+                // --- 標準問題平均分 (這部分不變) ---
                 const avgRatings = {
                     'overall-satisfaction': (sessionData.submissions.reduce((sum, s) => sum + (s.ratings['overall-satisfaction'] || 0), 0) / subCount).toFixed(1),
                     'content-relevance': (sessionData.submissions.reduce((sum, s) => sum + (s.ratings['content-relevance'] || 0), 0) / subCount).toFixed(1),
                     'speaker-clarity': (sessionData.submissions.reduce((sum, s) => sum + (s.ratings['speaker-clarity'] || 0), 0) / subCount).toFixed(1),
                     'practicality': (sessionData.submissions.reduce((sum, s) => sum + (s.ratings['practicality'] || 0), 0) / subCount).toFixed(1),
                 };
-                const commentsHtml = sessionData.submissions.filter(s => s.comments && s.comments.trim() !== '').map(s => `<li class="border-b py-2 text-sm"><strong>${s.submitterName || '匿名'}：</strong> ${s.comments}</li>`).join('')
-                return `<div class="bg-white p-6 rounded-2xl shadow-lg"><h2 class="text-xl font-bold text-gray-900">${sessionData.topic}</h2><p class="text-sm text-gray-500 mb-4">總共 ${subCount} 份回饋</p><div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-center"><div><p class="text-2xl font-bold">${avgRatings['overall-satisfaction']}</p><p class="text-xs text-gray-500">整體滿意度</p></div><div><p class="text-2xl font-bold">${avgRatings['content-relevance']}</p><p class="text-xs text-gray-500">內容幫助</p></div><div><p class="text-2xl font-bold">${avgRatings['speaker-clarity']}</p><p class="text-xs text-gray-500">表達清晰</p></div><div><p class="text-2xl font-bold">${avgRatings['practicality']}</p><p class="text-xs text-gray-500">實務應用</p></div></div><div><h3 class="text-md font-semibold mt-4 mb-2">其他建議：</h3><ul class="list-disc list-inside bg-gray-50 p-3 rounded-lg max-h-40 overflow-y-auto">${commentsHtml || '<li class="text-gray-400 text-sm">暫無文字回饋</li>'}</ul></div></div>`;
+                
+                // --- 處理 AI 生成問題和手動新增問題 ---
+                const questionStats = {};
+
+                sessionData.submissions.forEach(sub => {
+                    // 處理 AI 問題 (customResponses)
+                    (sub.customResponses || []).forEach(res => {
+                        if (!questionStats[res.question]) {
+                            questionStats[res.question] = { type: 'yesno', answers: {} };
+                        }
+                        questionStats[res.question].answers[res.answer] = (questionStats[res.question].answers[res.answer] || 0) + 1;
+                    });
+                    // 處理手動問題 (manualResponses)
+                    (sub.manualResponses || []).forEach(res => {
+                        if (!questionStats[res.question]) {
+                            questionStats[res.question] = { type: res.type, answers: res.type === 'text' ? [] : {} };
+                        }
+                        if (res.type === 'text') {
+                            questionStats[res.question].answers.push(res.answer);
+                        } else if (res.type === 'star') {
+                            // 對於星級問題，我們計算總分和次數以便計算平均
+                            let current = questionStats[res.question].answers;
+                            current.totalScore = (current.totalScore || 0) + parseInt(res.answer, 10);
+                            current.count = (current.count || 0) + 1;
+                        } else { // yesno
+                            questionStats[res.question].answers[res.answer] = (questionStats[res.question].answers[res.answer] || 0) + 1;
+                        }
+                    });
+                });
+                
+                let questionStatsHtml = Object.entries(questionStats).map(([question, stats]) => {
+                    let answersHtml = '';
+                    if (stats.type === 'yesno') {
+                        answersHtml = Object.entries(stats.answers)
+                            .map(([answer, count]) => `<span class="mr-4">${answer}: <strong>${count}</strong></span>`)
+                            .join('');
+                    } else if (stats.type === 'star') {
+                        const average = (stats.answers.totalScore / stats.answers.count).toFixed(1);
+                        answersHtml = `平均分數: <strong class="text-lg">${average}</strong> / 5`;
+                    } else if (stats.type === 'text') {
+                        answersHtml = stats.answers.map(answer => `<li class="text-sm text-gray-600 border-b py-1">${answer}</li>`).join('');
+                        return `<div class="py-2"><p class="font-semibold text-gray-800">${question}</p><ul class="mt-1 list-disc list-inside">${answersHtml}</ul></div>`;
+                    }
+                    return `<div class="py-2"><p class="font-semibold text-gray-800">${question}</p><div class="text-sm text-gray-600 mt-1">${answersHtml}</div></div>`;
+                }).join('');
+
+                if (questionStatsHtml) {
+                    questionStatsHtml = `<div class="mt-6 border-t pt-4"><h3 class="text-md font-semibold mb-2">自訂問題回饋：</h3><div class="space-y-2">${questionStatsHtml}</div></div>`;
+                }
+                
+                // --- 處理文字建議 (這部分微調) ---
+                const commentsHtml = sessionData.submissions
+                    .filter(s => s.comments && s.comments.trim() !== '')
+                    .map(s => `<li class="border-b py-2 text-sm"><strong>${s.submitterName || '匿名'}：</strong> ${s.comments}</li>`)
+                    .join('');
+
+                // --- 最終組合 HTML ---
+                return `
+                    <div class="bg-white p-6 rounded-2xl shadow-lg">
+                        <h2 class="text-xl font-bold text-gray-900">${sessionData.topic}</h2>
+                        <p class="text-sm text-gray-500 mb-4">總共 ${subCount} 份回饋</p>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-center">
+                            <div><p class="text-2xl font-bold">${avgRatings['overall-satisfaction']}</p><p class="text-xs text-gray-500">整體滿意度</p></div>
+                            <div><p class="text-2xl font-bold">${avgRatings['content-relevance']}</p><p class="text-xs text-gray-500">內容幫助</p></div>
+                            <div><p class="text-2xl font-bold">${avgRatings['speaker-clarity']}</p><p class="text-xs text-gray-500">表達清晰</p></div>
+                            <div><p class="text-2xl font-bold">${avgRatings['practicality']}</p><p class="text-xs text-gray-500">實務應用</p></div>
+                        </div>
+                        ${questionStatsHtml}
+                        <div>
+                            <h3 class="text-md font-semibold mt-4 mb-2">其他建議：</h3>
+                            <ul class="list-disc list-inside bg-gray-50 p-3 rounded-lg max-h-40 overflow-y-auto">${commentsHtml || '<li class="text-gray-400 text-sm">暫無文字回饋</li>'}</ul>
+                        </div>
+                    </div>`;
             }).join('');
         }
 
