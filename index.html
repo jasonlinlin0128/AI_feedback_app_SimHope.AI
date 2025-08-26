@@ -107,7 +107,15 @@
         import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Global Variables & Config ---
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const firebaseConfig = {
+          apiKey: "AIzaSyCbRwvK7guh61K9kp2QqTrEOE7nuEXIzPg",
+          authDomain: "ai-feedback-app-simhope-ai.firebaseapp.com",
+          projectId: "ai-feedback-app-simhope-ai",
+          storageBucket: "ai-feedback-app-simhope-ai.firebasestorage.app",
+              messagingSenderId: "415250131591",
+          appId: "1:415250131591:web:4ca7f131bc0340f1fbe622",
+          measurementId: "G-TQYH2D77YG"
+        };
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         let db, auth, userId;
 
