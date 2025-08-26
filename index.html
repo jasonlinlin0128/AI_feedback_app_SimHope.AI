@@ -213,8 +213,14 @@
             loginView.classList.add('hidden');
             appView.classList.remove('hidden');
             if (isManager) {
+                // 如果是管理者，直接顯示後台
                 toggleViewContainer.classList.remove('hidden');
+                generatorView.classList.add('hidden');
+                adminView.classList.remove('hidden');
+                toggleViewBtn.textContent = '返回表單生成器';
+                loadAndRenderStats(); // 載入數據
             }
+            // 與會者維持不變，預設顯示生成器畫面
         }
 
         attendeeBtn.addEventListener('click', () => { showAppView(false); });
@@ -309,11 +315,19 @@
             if (customQuestions && customQuestions.length > 0) {
                  customQuestionsHtml = `<div class="mt-8 border-t pt-6"><h3 class="text-lg font-semibold text-gray-800 mb-4">針對本次主題</h3>${customQuestions.map((q, index) => `<div class="mb-6"><label class="block text-md font-medium text-gray-700 mb-3" data-question-text="${q.question}">${index + 5}. ${q.question}</label><div class="flex items-center space-x-4"><input type="radio" id="custom-${index}-yes" name="custom-${index}" value="是" class="h-4 w-4 text-blue-600" required><label for="custom-${index}-yes">是</label><input type="radio" id="custom-${index}-no" name="custom-${index}" value="否" class="h-4 w-4 text-blue-600"><label for="custom-${index}-no">否</label><input type="radio" id="custom-${index}-neutral" name="custom-${index}" value="無意見" class="h-4 w-4 text-blue-600"><label for="custom-${index}-neutral">無意見</label></div></div>`).join('')}</div>`;
             }
-            formOutput.innerHTML = `<div class="text-center mb-6"><h2 class="text-2xl font-bold">${topic}</h2><p class="text-md text-gray-600 mt-1">分享會回饋表單</p></div><form id="feedback-form" data-session-id="${sessionId}" data-session-topic="${topic}">${standardQuestions.map(q => `<div class="mb-8"><label class="block text-md font-medium text-gray-700 mb-3">${q.text}</label><div class="star-rating flex flex-row-reverse justify-end"><input type="radio" id="${q.id}-5" name="${q.id}" value="5" required><label for="${q.id}-5">★</label><input type="radio" id="${q.id}-4" name="${q.id}" value="4"><label for="${q.id}-4">★</label><input type="radio" id="${q.id}-3" name="${q.id}" value="3"><label for="${q.id}-3">★</label><input type="radio" id="${q.id}-2" name="${q.id}" value="2"><label for="${q.id}-2">★</label><input type="radio" id="${q.id}-1" name="${q.id}" value="1"><label for="${q.id}-1">★</label></div></div>`).join('')}${customQuestionsHtml}<div class="mt-8 border-t pt-6"><label for="feedback-comments" class="block text-md font-medium text-gray-700 mb-2">其他建議或回饋：</label><textarea id="feedback-comments" name="feedback-comments" rows="5" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="任何您想讓我們知道的建議..."></textarea></div><div class="mt-8 text-center"><button type="submit" class="w-full sm:w-auto px-10 py-3 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700">提交回饋</button></div></form>`;
+            formOutput.innerHTML = `<div class="text-center mb-6"><h2 class="text-2xl font-bold">${topic}</h2><p class="text-md text-gray-600 mt-1">分享會回饋表單</p></div>
+            <form id="feedback-form" data-session-id="${sessionId}" data-session-topic="${topic}">
+                <div class="mb-8">
+                    <label for="submitter-name" class="block text-md font-medium text-gray-700 mb-2">您的姓名：</label>
+                    <input type="text" id="submitter-name" name="submitter-name" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="請輸入您的姓名" required>
+                </div>
+                ${standardQuestions.map(q => `<div class="mb-8"><label class="block text-md font-medium text-gray-700 mb-3">${q.text}</label><div class="star-rating flex flex-row-reverse justify-end"><input type="radio" id="${q.id}-5" name="${q.id}" value="5" required><label for="${q.id}-5">★</label><input type="radio" id="${q.id}-4" name="${q.id}" value="4"><label for="${q.id}-4">★</label><input type="radio" id="${q.id}-3" name="${q.id}" value="3"><label for="${q.id}-3">★</label><input type="radio" id="${q.id}-2" name="${q.id}" value="2"><label for="${q.id}-2">★</label><input type="radio" id="${q.id}-1" name="${q.id}" value="1"><label for="${q.id}-1">★</label></div></div>`).join('')}
+                ${customQuestionsHtml}
+                <div class="mt-8 border-t pt-6"><label for="feedback-comments" class="block text-md font-medium text-gray-700 mb-2">其他建議或回饋：</label><textarea id="feedback-comments" name="feedback-comments" rows="5" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="任何您想讓我們知道的建議..."></textarea></div><div class="mt-8 text-center"><button type="submit" class="w-full sm:w-auto px-10 py-3 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700">提交回饋</button></div>
+            </form>`;
             document.getElementById('feedback-form').addEventListener('submit', handleFormSubmit);
         }
-
-        // --- Data Handling (Firebase) ---
+// --- Data Handling (Firebase) ---
         async function handleFormSubmit(e) {
             e.preventDefault();
             if (!db) {
@@ -326,6 +340,7 @@
                 sessionId: form.dataset.sessionId,
                 sessionTopic: form.dataset.sessionTopic,
                 submittedAt: serverTimestamp(),
+                submitterName: formData.get('submitter-name'), // 取得姓名
                 ratings: {},
                 customResponses: [],
                 comments: formData.get('feedback-comments')
@@ -339,7 +354,6 @@
                 if (question && answer) data.customResponses.push({ question, answer });
             });
             try {
-                // **FIXED**: Corrected the collection path to have an odd number of segments.
                 await addDoc(collection(db, `artifacts/${appId}/public/data/feedbackSubmissions`), data);
                 showModal('提交成功！', '感謝您的寶貴回饋。');
                 form.reset();
@@ -387,7 +401,7 @@
                     'speaker-clarity': (sessionData.submissions.reduce((sum, s) => sum + (s.ratings['speaker-clarity'] || 0), 0) / subCount).toFixed(1),
                     'practicality': (sessionData.submissions.reduce((sum, s) => sum + (s.ratings['practicality'] || 0), 0) / subCount).toFixed(1),
                 };
-                const commentsHtml = sessionData.submissions.filter(s => s.comments && s.comments.trim() !== '').map(s => `<li class="border-b py-2 text-sm">${s.comments}</li>`).join('');
+                const commentsHtml = sessionData.submissions.filter(s => s.comments && s.comments.trim() !== '').map(s => `<li class="border-b py-2 text-sm"><strong>${s.submitterName || '匿名'}：</strong> ${s.comments}</li>`).join('')
                 return `<div class="bg-white p-6 rounded-2xl shadow-lg"><h2 class="text-xl font-bold text-gray-900">${sessionData.topic}</h2><p class="text-sm text-gray-500 mb-4">總共 ${subCount} 份回饋</p><div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-center"><div><p class="text-2xl font-bold">${avgRatings['overall-satisfaction']}</p><p class="text-xs text-gray-500">整體滿意度</p></div><div><p class="text-2xl font-bold">${avgRatings['content-relevance']}</p><p class="text-xs text-gray-500">內容幫助</p></div><div><p class="text-2xl font-bold">${avgRatings['speaker-clarity']}</p><p class="text-xs text-gray-500">表達清晰</p></div><div><p class="text-2xl font-bold">${avgRatings['practicality']}</p><p class="text-xs text-gray-500">實務應用</p></div></div><div><h3 class="text-md font-semibold mt-4 mb-2">其他建議：</h3><ul class="list-disc list-inside bg-gray-50 p-3 rounded-lg max-h-40 overflow-y-auto">${commentsHtml || '<li class="text-gray-400 text-sm">暫無文字回饋</li>'}</ul></div></div>`;
             }).join('');
         }
