@@ -6,6 +6,7 @@
     <title>AI 分享會回饋表單生成器 (V2)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
@@ -219,7 +220,7 @@
                 generatorView.classList.add('hidden');
                 adminView.classList.remove('hidden');
                 toggleViewBtn.textContent = '返回表單生成器';
-                loadAndRenderStats(); // 載入數據
+                loadAnd(); // 載入數據
             }
             // 與會者維持不變，預設顯示生成器畫面
         }
@@ -253,7 +254,7 @@
                 generatorView.classList.add('hidden');
                 adminView.classList.remove('hidden');
                 toggleViewBtn.textContent = '返回表單生成器';
-                loadAndRenderStats();
+                loadAnd();
             }
         }
 
@@ -469,7 +470,7 @@ function addQuestion(type) {
         }
         
         // --- Admin View Logic ---
-        async function loadAndRenderStats() {
+        async function loadAnd() {
             if (!db) {
                 statsContainer.innerHTML = '<p class="text-center text-red-500">資料庫未連接。</p>';
                 return;
@@ -498,89 +499,117 @@ function addQuestion(type) {
         }
 
 function renderStats(sessions) {
-            statsContainer.innerHTML = Object.entries(sessions).map(([sessionId, sessionData]) => {
+            // 先清空容器，避免重複渲染
+            statsContainer.innerHTML = '';
+            
+            // 使用 for...of 迴圈代替 map，因為需要在迴圈內執行圖表渲染
+            for (const [sessionId, sessionData] of Object.entries(sessions)) {
                 const subCount = sessionData.submissions.length;
-                // --- 標準問題平均分 (這部分不變) ---
-                const avgRatings = {
-                    'overall-satisfaction': (sessionData.submissions.reduce((sum, s) => sum + (s.ratings['overall-satisfaction'] || 0), 0) / subCount).toFixed(1),
-                    'content-relevance': (sessionData.submissions.reduce((sum, s) => sum + (s.ratings['content-relevance'] || 0), 0) / subCount).toFixed(1),
-                    'speaker-clarity': (sessionData.submissions.reduce((sum, s) => sum + (s.ratings['speaker-clarity'] || 0), 0) / subCount).toFixed(1),
-                    'practicality': (sessionData.submissions.reduce((sum, s) => sum + (s.ratings['practicality'] || 0), 0) / subCount).toFixed(1),
-                };
-                
-                // --- 處理 AI 生成問題和手動新增問題 ---
-                const questionStats = {};
+                const card = document.createElement('div');
+                card.className = 'bg-white p-6 rounded-2xl shadow-lg mb-8'; // 為每個 session 建立一個卡片元素
 
-                sessionData.submissions.forEach(sub => {
-                    // 處理 AI 問題 (customResponses)
-                    (sub.customResponses || []).forEach(res => {
-                        if (!questionStats[res.question]) {
-                            questionStats[res.question] = { type: 'yesno', answers: {} };
+                // --- 資料處理：計算各星級數量 ---
+                const ratingIds = ['overall-satisfaction', 'content-relevance', 'speaker-clarity', 'practicality'];
+                const ratingLabels = ['整體滿意度', '內容幫助', '表達清晰', '實務應用'];
+                const ratingCounts = {};
+                ratingIds.forEach(id => {
+                    ratingCounts[id] = [0, 0, 0, 0, 0]; // Index 0-4 for stars 1-5
+                    sessionData.submissions.forEach(sub => {
+                        const score = sub.ratings[id];
+                        if (score >= 1 && score <= 5) {
+                            ratingCounts[id][score - 1]++;
                         }
+                    });
+                });
+
+                // --- 圖表區塊的 HTML ---
+                const chartsHtml = ratingIds.map((id, index) => `
+                    <div class="text-center">
+                        <canvas id="chart-${sessionId}-${id}" width="150" height="150"></canvas>
+                        <p class="text-xs text-gray-500 mt-2">${ratingLabels[index]}</p>
+                    </div>
+                `).join('');
+
+                // --- 處理 AI 生成問題和手動新增問題 (這部分邏輯不變) ---
+                const questionStats = {};
+                sessionData.submissions.forEach(sub => {
+                    (sub.customResponses || []).forEach(res => {
+                        if (!questionStats[res.question]) { questionStats[res.question] = { type: 'yesno', answers: {} }; }
                         questionStats[res.question].answers[res.answer] = (questionStats[res.question].answers[res.answer] || 0) + 1;
                     });
-                    // 處理手動問題 (manualResponses)
                     (sub.manualResponses || []).forEach(res => {
-                        if (!questionStats[res.question]) {
-                            questionStats[res.question] = { type: res.type, answers: res.type === 'text' ? [] : {} };
-                        }
-                        if (res.type === 'text') {
-                            questionStats[res.question].answers.push(res.answer);
-                        } else if (res.type === 'star') {
-                            // 對於星級問題，我們計算總分和次數以便計算平均
+                        if (!questionStats[res.question]) { questionStats[res.question] = { type: res.type, answers: res.type === 'text' ? [] : {} }; }
+                        if (res.type === 'text') { questionStats[res.question].answers.push(res.answer); }
+                        else if (res.type === 'star') {
                             let current = questionStats[res.question].answers;
                             current.totalScore = (current.totalScore || 0) + parseInt(res.answer, 10);
                             current.count = (current.count || 0) + 1;
-                        } else { // yesno
+                        } else {
                             questionStats[res.question].answers[res.answer] = (questionStats[res.question].answers[res.answer] || 0) + 1;
                         }
                     });
                 });
-                
                 let questionStatsHtml = Object.entries(questionStats).map(([question, stats]) => {
                     let answersHtml = '';
-                    if (stats.type === 'yesno') {
-                        answersHtml = Object.entries(stats.answers)
-                            .map(([answer, count]) => `<span class="mr-4">${answer}: <strong>${count}</strong></span>`)
-                            .join('');
-                    } else if (stats.type === 'star') {
-                        const average = (stats.answers.totalScore / stats.answers.count).toFixed(1);
-                        answersHtml = `平均分數: <strong class="text-lg">${average}</strong> / 5`;
-                    } else if (stats.type === 'text') {
+                    if (stats.type === 'yesno') { answersHtml = Object.entries(stats.answers).map(([answer, count]) => `<span class="mr-4">${answer}: <strong>${count}</strong></span>`).join(''); }
+                    else if (stats.type === 'star') { const average = (stats.answers.totalScore / stats.answers.count).toFixed(1); answersHtml = `平均分數: <strong class="text-lg">${average}</strong> / 5`; }
+                    else if (stats.type === 'text') {
                         answersHtml = stats.answers.map(answer => `<li class="text-sm text-gray-600 border-b py-1">${answer}</li>`).join('');
                         return `<div class="py-2"><p class="font-semibold text-gray-800">${question}</p><ul class="mt-1 list-disc list-inside">${answersHtml}</ul></div>`;
                     }
                     return `<div class="py-2"><p class="font-semibold text-gray-800">${question}</p><div class="text-sm text-gray-600 mt-1">${answersHtml}</div></div>`;
                 }).join('');
-
-                if (questionStatsHtml) {
-                    questionStatsHtml = `<div class="mt-6 border-t pt-4"><h3 class="text-md font-semibold mb-2">自訂問題回饋：</h3><div class="space-y-2">${questionStatsHtml}</div></div>`;
-                }
+                if (questionStatsHtml) { questionStatsHtml = `<div class="mt-6 border-t pt-4"><h3 class="text-md font-semibold mb-2">自訂問題回饋：</h3><div class="space-y-2">${questionStatsHtml}</div></div>`; }
                 
-                // --- 處理文字建議 (這部分微調) ---
-                const commentsHtml = sessionData.submissions
-                    .filter(s => s.comments && s.comments.trim() !== '')
-                    .map(s => `<li class="border-b py-2 text-sm"><strong>${s.submitterName || '匿名'}：</strong> ${s.comments}</li>`)
-                    .join('');
+                const commentsHtml = sessionData.submissions.filter(s => s.comments && s.comments.trim() !== '').map(s => `<li class="border-b py-2 text-sm"><strong>${s.submitterName || '匿名'}：</strong> ${s.comments}</li>`).join('');
 
-                // --- 最終組合 HTML ---
-                return `
-                    <div class="bg-white p-6 rounded-2xl shadow-lg">
-                        <h2 class="text-xl font-bold text-gray-900">${sessionData.topic}</h2>
-                        <p class="text-sm text-gray-500 mb-4">總共 ${subCount} 份回饋</p>
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-center">
-                            <div><p class="text-2xl font-bold">${avgRatings['overall-satisfaction']}</p><p class="text-xs text-gray-500">整體滿意度</p></div>
-                            <div><p class="text-2xl font-bold">${avgRatings['content-relevance']}</p><p class="text-xs text-gray-500">內容幫助</p></div>
-                            <div><p class="text-2xl font-bold">${avgRatings['speaker-clarity']}</p><p class="text-xs text-gray-500">表達清晰</p></div>
-                            <div><p class="text-2xl font-bold">${avgRatings['practicality']}</p><p class="text-xs text-gray-500">實務應用</p></div>
-                        </div>
-                        ${questionStatsHtml}
-                        <div>
-                            <h3 class="text-md font-semibold mt-4 mb-2">其他建議：</h3>
-                            <ul class="list-disc list-inside bg-gray-50 p-3 rounded-lg max-h-40 overflow-y-auto">${commentsHtml || '<li class="text-gray-400 text-sm">暫無文字回饋</li>'}</ul>
-                        </div>
-                    </div>`;
-            }).join('');
+                // 組合完整的卡片 HTML
+                card.innerHTML = `
+                    <h2 class="text-xl font-bold text-gray-900">${sessionData.topic}</h2>
+                    <p class="text-sm text-gray-500 mb-4">總共 ${subCount} 份回饋</p>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                        ${chartsHtml}
+                    </div>
+                    ${questionStatsHtml}
+                    <div>
+                        <h3 class="text-md font-semibold mt-4 mb-2">其他建議：</h3>
+                        <ul class="list-disc list-inside bg-gray-50 p-3 rounded-lg max-h-40 overflow-y-auto">${commentsHtml || '<li class="text-gray-400 text-sm">暫無文字回饋</li>'}</ul>
+                    </div>
+                `;
+                statsContainer.appendChild(card); // 將卡片加入到容器中
+
+                // --- 繪製圖表 ---
+                // 確保 canvas 元素已經被渲染到頁面上
+                setTimeout(() => {
+                    ratingIds.forEach(id => {
+                        const ctx = document.getElementById(`chart-${sessionId}-${id}`);
+                        if (ctx) {
+                            new Chart(ctx.getContext('2d'), {
+                                type: 'pie',
+                                data: {
+                                    labels: ['1星', '2星', '3星', '4星', '5星'],
+                                    datasets: [{
+                                        data: ratingCounts[id],
+                                        backgroundColor: ['#ef4444', '#f97316', '#eab308', '#84cc16', '#22c55e'],
+                                        hoverOffset: 4
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    plugins: {
+                                        legend: {
+                                            position: 'top',
+                                            labels: {
+                                                font: { size: 10 }
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    });
+                }, 0);
+            }
         }
 
         // --- UI Control Functions ---
