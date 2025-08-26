@@ -215,7 +215,23 @@
                 loadAndRenderStats();
             }
         }
-        
+        // --- Event Listeners ---
+        attendeeBtn.addEventListener('click', () => showAppView(false));
+        managerBtn.addEventListener('click', () => passwordSection.classList.remove('hidden'));
+        loginSubmitBtn.addEventListener('click', () => {
+            if (passwordInput.value === 'admin123') {
+                showAppView(true);
+            } else {
+                showModal('登入失敗', '密碼錯誤，請重試。', true);
+                passwordInput.value = '';
+            }
+        });
+        toggleViewBtn.addEventListener('click', toggleAdminView);
+        generateBtn.addEventListener('click', handleGenerateForm);
+        closeModalBtn.addEventListener('click', () => {
+             messageModal.classList.add('hidden');
+             messageModal.classList.remove('flex');
+        });
         // --- Form Generation (AI Disabled) ---
         async function handleGenerateForm() {
             const topic = sessionTopicInput.value.trim();
