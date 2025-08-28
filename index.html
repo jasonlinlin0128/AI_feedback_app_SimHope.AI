@@ -742,26 +742,26 @@
                 messageModal.classList.add('flex');
             }
 
-            // --- Gemini API Call ---
+            // 前端程式碼修改
             async function getCustomQuestions(topic, summary, fileContent) {
-                const prompt = `你是一個活動問卷設計專家。請根據以下 AI 分享會的資訊，設計 2 個最相關、最能評估學習成效的封閉式問題（是/否/無意見）。主題：${topic} 內容摘要：${summary} ${fileContent ? `補充文件內容：\n${fileContent.substring(0, 3000)}` : ''} 請確保問題簡潔明瞭，並以繁體中文回答。`;
                 const payload = {
-                    contents: [{ role: "user", parts: [{ text: prompt }] }],
-                    generationConfig: {
-                        responseMimeType: "application/json",
-                        responseSchema: { type: "OBJECT", properties: { questions: { type: "ARRAY", items: { type: "OBJECT", properties: { question: { type: "STRING" } }, required: ["question"] }}}, required: ["questions"] }
-                    }
+                    topic,
+                    summary,
+                    fileContent: fileContent ? fileContent.substring(0, 3000) : ''
                 };
-                const apiKey = ""; // This is handled by the environment
-                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+    
                 try {
-                    const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    const response = await fetch('/api/generate-questions', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+        
                     if (!response.ok) throw new Error(`API request failed with status ${response.status}`);
                     const result = await response.json();
-                    const jsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
-                    return JSON.parse(jsonText).questions || [];
+                    return result.questions || [];
                 } catch (error) {
-                    console.error("Gemini API call failed:", error);
+                    console.error("Question generation failed:", error);
                     throw error;
                 }
             }
