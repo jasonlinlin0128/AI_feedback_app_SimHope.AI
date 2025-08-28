@@ -294,7 +294,8 @@
                 manualQuestionCounter = 0; // Reset counter for each new form
 
                 const customQuestionsHtml = customQuestions.map(q => {
-                    const questionHtml = `<div class="mb-6"><label class="block text-md font-medium text-gray-700 mb-3">${nextQuestionNumber++}. ${q.question}</label><div class="flex items-center space-x-4"><input type="radio" id="ai-q-${nextQuestionNumber-1}-yes" name="ai-q-${nextQuestionNumber-1}" value="是" required><label for="ai-q-${nextQuestionNumber-1}-yes">是</label><input type="radio" id="ai-q-${nextQuestionNumber-1}-no" name="ai-q-${nextQuestionNumber-1}" value="否"><label for="ai-q-${nextQuestionNumber-1}-no">否</label><input type="radio" id="ai-q-${nextQuestionNumber-1}-neutral" name="ai-q-${nextQuestionNumber-1}" value="無意見"><label for="ai-q-${nextQuestionNumber-1}-neutral">無意見</label></div></div>`;
+                    const questionHtml = `<div class="mb-6"><label class="block text-md font-medium text-gray-700 mb-3" for="ai-q-${nextQuestionNumber}">${nextQuestionNumber}. ${q.question}</label><div class="flex items-center space-x-4"><input type="radio" id="ai-q-${nextQuestionNumber}-yes" name="ai-q-${nextQuestionNumber}" value="是" required><label for="ai-q-${nextQuestionNumber}-yes">是</label><input type="radio" id="ai-q-${nextQuestionNumber}-no" name="ai-q-${nextQuestionNumber}" value="否"><label for="ai-q-${nextQuestionNumber}-no">否</label><input type="radio" id="ai-q-${nextQuestionNumber}-neutral" name="ai-q-${nextQuestionNumber}" value="無意見"><label for="ai-q-${nextQuestionNumber}-neutral">無意見</label></div></div>`;
+                    nextQuestionNumber++;
                     return questionHtml;
                 }).join('');
 
@@ -359,17 +360,19 @@
                     const label = div.previousElementSibling;
                     if (label) questions.push({ type: 'star', text: label.textContent });
                 });
-                // Add AI-generated questions
-                form.querySelectorAll('label[for^="ai-q-"]').forEach(label => {
-                    if (label) questions.push({ type: 'yesno', text: label.textContent });
-                });
-                // Add manually-added questions
-                form.querySelectorAll('.manual-question').forEach(div => {
-                    const textInput = div.querySelector('.manual-question-input');
-                    if (textInput && textInput.value) {
-                         questions.push({ type: div.dataset.type, text: textInput.value });
+                // Add AI-generated and manually-added questions
+                form.querySelectorAll('label[for^="ai-q-"], .manual-question .manual-question-input').forEach(el => {
+                    let text, type;
+                    if (el.tagName === 'LABEL') {
+                        text = el.textContent;
+                        type = 'yesno';
+                    } else { // It's an input
+                        text = el.value;
+                        type = el.closest('.manual-question').dataset.type;
                     }
+                    if (text) questions.push({ type, text });
                 });
+
                 // Add final comment box
                 questions.push({ type: 'textarea', text: '其他建議或回饋：' });
 
@@ -466,10 +469,18 @@
                     return;
                 }
                 statsContainer.innerHTML = '<p class="text-center text-gray-500">正在載入數據...</p>';
+                console.log("DEBUG: Attempting to query Firestore at:", `artifacts/${appId}/public/data/feedbackSubmissions`); // DEBUG LOG
                 const feedbackQuery = query(collection(db, `artifacts/${appId}/public/data/feedbackSubmissions`));
+                
                 onSnapshot(feedbackQuery, (querySnapshot) => {
+                    console.log(`DEBUG: onSnapshot triggered. Found ${querySnapshot.size} submissions.`); // DEBUG LOG
                     const submissions = [];
                     querySnapshot.forEach((doc) => submissions.push({ id: doc.id, ...doc.data() }));
+                    
+                    if (querySnapshot.size > 0) {
+                        console.log("DEBUG: First submission data:", submissions[0]); // DEBUG LOG
+                    }
+
                     if (submissions.length === 0) {
                         statsContainer.innerHTML = '<p class="text-center text-gray-500">目前沒有任何回饋資料。</p>';
                         return;
@@ -483,8 +494,8 @@
                     }, {});
                     renderStats(sessions);
                 }, (error) => {
-                    console.error("Error fetching stats:", error);
-                    statsContainer.innerHTML = '<p class="text-center text-red-500">讀取資料時發生錯誤。請檢查 Firestore 安全規則。</p>';
+                    console.error("Error fetching stats:", error); // Keep this for detailed errors
+                    statsContainer.innerHTML = '<p class="text-center text-red-500">讀取資料時發生錯誤。請檢查 Firestore 安全規則。 </p>';
                 });
             }
 
