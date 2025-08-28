@@ -274,7 +274,7 @@
                     customQuestions = await getCustomQuestions(topic, summary, fileContent);
                 } catch (error) {
                     console.error('Error generating form:', error);
-                    showModal('AI 生成失敗', '無法從 AI 獲取建議問題，請檢查您的 Google Cloud 專案是否已啟用 Generative Language API。將僅使用標準問題。', true);
+                    showModal('AI 生成失敗', '無法從 AI 獲取建議問題，請檢查您的 Google Cloud 專案是否已啟用 Generative Language API 且 API 金鑰限制已正確設定。', true);
                 } finally {
                     renderForm(topic, customQuestions, crypto.randomUUID());
                     formOutput.classList.remove('hidden');
@@ -363,14 +363,19 @@
                 // Add AI-generated and manually-added questions
                 form.querySelectorAll('label[for^="ai-q-"], .manual-question .manual-question-input').forEach(el => {
                     let text, type;
-                    if (el.tagName === 'LABEL') {
-                        text = el.textContent;
-                        type = 'yesno';
-                    } else { // It's an input
+                    // For AI questions, find the label text
+                    if (el.tagName === 'LABEL' && el.htmlFor.startsWith('ai-q-')) {
+                         text = el.textContent;
+                         type = 'yesno';
+                    // For manual questions, get the input value
+                    } else if (el.classList.contains('manual-question-input')) {
                         text = el.value;
                         type = el.closest('.manual-question').dataset.type;
                     }
-                    if (text) questions.push({ type, text });
+                    // Add to questions array if text is valid
+                    if (text && !questions.some(q => q.text === text)) {
+                        questions.push({ type, text });
+                    }
                 });
 
                 // Add final comment box
@@ -469,17 +474,11 @@
                     return;
                 }
                 statsContainer.innerHTML = '<p class="text-center text-gray-500">正在載入數據...</p>';
-                console.log("DEBUG: Attempting to query Firestore at:", `artifacts/${appId}/public/data/feedbackSubmissions`); // DEBUG LOG
                 const feedbackQuery = query(collection(db, `artifacts/${appId}/public/data/feedbackSubmissions`));
                 
                 onSnapshot(feedbackQuery, (querySnapshot) => {
-                    console.log(`DEBUG: onSnapshot triggered. Found ${querySnapshot.size} submissions.`); // DEBUG LOG
                     const submissions = [];
                     querySnapshot.forEach((doc) => submissions.push({ id: doc.id, ...doc.data() }));
-                    
-                    if (querySnapshot.size > 0) {
-                        console.log("DEBUG: First submission data:", submissions[0]); // DEBUG LOG
-                    }
 
                     if (submissions.length === 0) {
                         statsContainer.innerHTML = '<p class="text-center text-gray-500">目前沒有任何回饋資料。</p>';
@@ -494,7 +493,7 @@
                     }, {});
                     renderStats(sessions);
                 }, (error) => {
-                    console.error("Error fetching stats:", error); // Keep this for detailed errors
+                    console.error("Error fetching stats:", error);
                     statsContainer.innerHTML = '<p class="text-center text-red-500">讀取資料時發生錯誤。請檢查 Firestore 安全規則。 </p>';
                 });
             }
@@ -520,7 +519,8 @@
                         const questionText = standardQuestions[index];
                         const counts = [0, 0, 0, 0, 0];
                         sessionData.submissions.forEach(sub => {
-                            const response = (sub.responses || []).find(r => r.question.trim() === questionText.trim());
+                            // **FIX**: Added safety check for sub.responses
+                            const response = (sub.responses || []).find(r => r && r.question && r.question.trim() === questionText.trim());
                             const score = response ? parseInt(response.answer) : 0;
                             if (score >= 1 && score <= 5) counts[score - 1]++;
                         });
@@ -542,9 +542,11 @@
                     }).join('');
 
                     const commentsHtml = sessionData.submissions.map(sub => {
-                        const name = (sub.responses.find(r => r.question === "您的姓名：") || {}).answer || '匿名';
-                        const department = (sub.responses.find(r => r.question === "您的部門：") || {}).answer || '未提供';
-                        const comment = (sub.responses.find(r => r.question === "其他建議或回饋：") || {}).answer || '';
+                        // **FIX**: Added safety check for sub.responses
+                        const safeResponses = sub.responses || [];
+                        const name = (safeResponses.find(r => r.question === "您的姓名：") || {}).answer || '匿名';
+                        const department = (safeResponses.find(r => r.question === "您的部門：") || {}).answer || '未提供';
+                        const comment = (safeResponses.find(r => r.question === "其他建議或回饋：") || {}).answer || '';
                         if (!comment.trim()) return null;
                         return `<li class="border-b py-2 text-sm"><p><strong>${name}</strong> <span class="text-gray-500">(${department})</span></p><p class="mt-1">${comment}</p></li>`;
                     }).filter(Boolean).join('');
@@ -566,7 +568,8 @@
                             const questionText = standardQuestions[index];
                             const counts = [0, 0, 0, 0, 0];
                             sessionData.submissions.forEach(sub => {
-                                 const response = (sub.responses || []).find(r => r.question.trim() === questionText.trim());
+                                 // **FIX**: Added safety check for sub.responses
+                                 const response = (sub.responses || []).find(r => r && r.question && r.question.trim() === questionText.trim());
                                  const score = response ? parseInt(response.answer) : 0;
                                  if (score >= 1 && score <= 5) counts[score - 1]++;
                             });
