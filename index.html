@@ -291,7 +291,7 @@
                 ];
 
                 nextQuestionNumber = standardQuestions.length + 1;
-                manualQuestionCounter = 0; // Reset counter for each new form
+                manualQuestionCounter = 0;
 
                 const customQuestionsHtml = customQuestions.map(q => {
                     const questionHtml = `<div class="mb-6"><label class="block text-md font-medium text-gray-700 mb-3" for="ai-q-${nextQuestionNumber}">${nextQuestionNumber}. ${q.question}</label><div class="flex items-center space-x-4"><input type="radio" id="ai-q-${nextQuestionNumber}-yes" name="ai-q-${nextQuestionNumber}" value="是" required><label for="ai-q-${nextQuestionNumber}-yes">是</label><input type="radio" id="ai-q-${nextQuestionNumber}-no" name="ai-q-${nextQuestionNumber}" value="否"><label for="ai-q-${nextQuestionNumber}-no">否</label><input type="radio" id="ai-q-${nextQuestionNumber}-neutral" name="ai-q-${nextQuestionNumber}" value="無意見"><label for="ai-q-${nextQuestionNumber}-neutral">無意見</label></div></div>`;
@@ -353,32 +353,29 @@
                 if (!form) return;
 
                 const questions = [];
-                // Add standard questions
                 questions.push({ type: 'name', text: '您的姓名：' });
                 questions.push({ type: 'department', text: '您的部門：' });
                 form.querySelectorAll('.star-rating').forEach(div => {
                     const label = div.previousElementSibling;
                     if (label) questions.push({ type: 'star', text: label.textContent });
                 });
-                // Add AI-generated and manually-added questions
-                form.querySelectorAll('label[for^="ai-q-"], .manual-question .manual-question-input').forEach(el => {
-                    let text, type;
-                    // For AI questions, find the label text
-                    if (el.tagName === 'LABEL' && el.htmlFor.startsWith('ai-q-')) {
-                         text = el.textContent;
-                         type = 'yesno';
-                    // For manual questions, get the input value
-                    } else if (el.classList.contains('manual-question-input')) {
-                        text = el.value;
-                        type = el.closest('.manual-question').dataset.type;
+                
+                form.querySelectorAll('label[for^="ai-q-"]').forEach(label => {
+                    if (label && label.textContent) {
+                        const uniqueText = label.textContent;
+                         if (!questions.some(q => q.text === uniqueText)) {
+                            questions.push({ type: 'yesno', text: uniqueText });
+                        }
                     }
-                    // Add to questions array if text is valid
-                    if (text && !questions.some(q => q.text === text)) {
-                        questions.push({ type, text });
+                });
+                
+                form.querySelectorAll('.manual-question').forEach(div => {
+                    const textInput = div.querySelector('.manual-question-input');
+                    if (textInput && textInput.value) {
+                         questions.push({ type: div.dataset.type, text: textInput.value });
                     }
                 });
 
-                // Add final comment box
                 questions.push({ type: 'textarea', text: '其他建議或回饋：' });
 
                 const formStructure = {
@@ -519,7 +516,6 @@
                         const questionText = standardQuestions[index];
                         const counts = [0, 0, 0, 0, 0];
                         sessionData.submissions.forEach(sub => {
-                            // **FIX**: Added safety check for sub.responses
                             const response = (sub.responses || []).find(r => r && r.question && r.question.trim() === questionText.trim());
                             const score = response ? parseInt(response.answer) : 0;
                             if (score >= 1 && score <= 5) counts[score - 1]++;
@@ -542,7 +538,6 @@
                     }).join('');
 
                     const commentsHtml = sessionData.submissions.map(sub => {
-                        // **FIX**: Added safety check for sub.responses
                         const safeResponses = sub.responses || [];
                         const name = (safeResponses.find(r => r.question === "您的姓名：") || {}).answer || '匿名';
                         const department = (safeResponses.find(r => r.question === "您的部門：") || {}).answer || '未提供';
@@ -550,11 +545,66 @@
                         if (!comment.trim()) return null;
                         return `<li class="border-b py-2 text-sm"><p><strong>${name}</strong> <span class="text-gray-500">(${department})</span></p><p class="mt-1">${comment}</p></li>`;
                     }).filter(Boolean).join('');
+                    
+                    // **FIX START**: Logic to calculate and render custom question statistics
+                    const customQuestionStats = {};
+                    const fixedQuestions = [...standardQuestions, "您的姓名：", "您的部門：", "其他建議或回饋："];
+                    
+                    sessionData.submissions.forEach(sub => {
+                        (sub.responses || []).forEach(response => {
+                            if (response && response.question && !fixedQuestions.includes(response.question.trim())) {
+                                const qText = response.question.trim();
+                                if (!customQuestionStats[qText]) {
+                                    customQuestionStats[qText] = { '是': 0, '否': 0, '無意見': 0, total: 0 };
+                                }
+                                const answer = response.answer;
+                                if (answer && answer in customQuestionStats[qText]) {
+                                    customQuestionStats[qText][answer]++;
+                                    customQuestionStats[qText].total++;
+                                }
+                            }
+                        });
+                    });
+
+                    const customQuestionsHtml = Object.entries(customQuestionStats).map(([question, stats]) => {
+                        if (stats.total === 0) return '';
+                        const yesPercent = ((stats['是'] / stats.total) * 100).toFixed(0);
+                        const noPercent = ((stats['否'] / stats.total) * 100).toFixed(0);
+                        const neutralPercent = ((stats['無意見'] / stats.total) * 100).toFixed(0);
+
+                        return `
+                            <div class="mt-4 pt-4 border-t">
+                                <h4 class="font-semibold text-gray-800 mb-2 text-sm">${question}</h4>
+                                <ul class="space-y-1 text-sm">
+                                    <li class="flex items-center justify-between gap-x-2">
+                                        <span>是</span>
+                                        <div class="w-2/3 bg-gray-200 rounded-full h-4">
+                                            <div class="bg-green-500 h-4 rounded-full flex items-center justify-center text-white text-xs" style="width: ${yesPercent}%">${yesPercent > 15 ? yesPercent + '%' : ''}</div>
+                                        </div>
+                                    </li>
+                                    <li class="flex items-center justify-between gap-x-2">
+                                        <span>否</span>
+                                        <div class="w-2/3 bg-gray-200 rounded-full h-4">
+                                            <div class="bg-red-500 h-4 rounded-full flex items-center justify-center text-white text-xs" style="width: ${noPercent}%">${noPercent > 15 ? noPercent + '%' : ''}</div>
+                                        </div>
+                                    </li>
+                                    <li class="flex items-center justify-between gap-x-2">
+                                        <span>無意見</span>
+                                        <div class="w-2/3 bg-gray-200 rounded-full h-4">
+                                            <div class="bg-gray-400 h-4 rounded-full flex items-center justify-center text-white text-xs" style="width: ${neutralPercent}%">${neutralPercent > 15 ? neutralPercent + '%' : ''}</div>
+                                        </div>
+                                    </li>
+                                </ul>
+                            </div>
+                        `;
+                    }).join('');
+                    // **FIX END**
 
                     card.innerHTML = `
                         <h2 class="text-xl font-bold text-gray-900">${sessionData.topic}</h2>
                         <p class="text-sm text-gray-500 mb-6">總共 ${subCount} 份回饋</p>
                         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-6">${statsHtml}</div>
+                        ${customQuestionsHtml ? `<div class="mt-6"><h3 class="text-md font-semibold mt-4 mb-2">自訂問題統計：</h3>${customQuestionsHtml}</div>` : ''}
                         <div class="mt-6">
                             <h3 class="text-md font-semibold mt-4 mb-2">其他建議：</h3>
                             <ul class="bg-gray-50 p-3 rounded-lg max-h-40 overflow-y-auto">${commentsHtml || '<li class="text-gray-400 text-sm">暫無文字回饋</li>'}</ul>
@@ -568,7 +618,6 @@
                             const questionText = standardQuestions[index];
                             const counts = [0, 0, 0, 0, 0];
                             sessionData.submissions.forEach(sub => {
-                                 // **FIX**: Added safety check for sub.responses
                                  const response = (sub.responses || []).find(r => r && r.question && r.question.trim() === questionText.trim());
                                  const score = response ? parseInt(response.answer) : 0;
                                  if (score >= 1 && score <= 5) counts[score - 1]++;
@@ -666,4 +715,4 @@
         });
     </script>
 </body>
-</html>
+</ht
