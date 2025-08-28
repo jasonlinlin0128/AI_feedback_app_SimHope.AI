@@ -123,6 +123,7 @@
                 </div>
             </div>
         </div>
+    </div>
 
    <script type="module">
         // Firebase Imports
@@ -135,7 +136,7 @@
             apiKey: "AIzaSyCbRwvK7guh61K9kp2QqTrEOE7nuEXIzPg",
             authDomain: "ai-feedback-app-simhope-ai.firebaseapp.com",
             projectId: "ai-feedback-app-simhope-ai",
-            storageBucket: "ai-feedback-app-simhope-ai.firebasestorage.app",
+            storageBucket: "ai-feedback-app-simhope-ai.appspot.com",
             messagingSenderId: "415250131591",
             appId: "1:415250131591:web:4ca7f131bc0340f1fbe622",
             measurementId: "G-TQYH2D77YG"
@@ -147,6 +148,7 @@
         let db, auth, userId;
         let nextQuestionNumber = 1;
         let manualQuestionCounter = 0;
+        let activeCharts = new Map();
 
         // --- Main App Logic (runs after DOM is loaded) ---
         document.addEventListener('DOMContentLoaded', () => {
@@ -235,20 +237,52 @@
                 messageModal.classList.remove('flex');
             });
 
-            // --- Form Generation (AI Disabled) ---
+            // --- File Handling ---
+            async function getFileContent() {
+                const file = fileUpload.files[0];
+                if (!file) return "";
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = async (event) => {
+                        try {
+                            if (file.name.endsWith('.docx')) {
+                                const result = await mammoth.extractRawText({ arrayBuffer: event.target.result });
+                                resolve(result.value);
+                            } else {
+                                resolve("（此檔案格式暫不支援預覽）");
+                            }
+                        } catch (err) { reject(err); }
+                    };
+                    reader.onerror = (error) => reject(error);
+                    reader.readAsArrayBuffer(file);
+                });
+            }
+
+            // --- Form Generation (Re-enabled AI) ---
             async function handleGenerateForm() {
                 const topic = sessionTopicInput.value.trim();
-                if (!topic) {
-                    showModal('資料不完整', '請至少輸入分享會的主題。', true);
+                const summary = sessionSummaryInput.value.trim();
+                if (!topic || !summary) {
+                    showModal('資料不完整', '請輸入分享會的主題和內容摘要。', true);
                     return;
                 }
                 setLoading(true);
-                renderForm(topic, crypto.randomUUID());
-                formOutput.classList.remove('hidden');
-                setLoading(false);
+                let fileContent = "";
+                let customQuestions = [];
+                try {
+                    if (fileUpload.files.length > 0) fileContent = await getFileContent();
+                    customQuestions = await getCustomQuestions(topic, summary, fileContent);
+                } catch (error) {
+                    console.error('Error generating form:', error);
+                    showModal('AI 生成失敗', '無法從 AI 獲取建議問題，請檢查您的 Google Cloud 專案是否已啟用 Generative Language API。將僅使用標準問題。', true);
+                } finally {
+                    renderForm(topic, customQuestions, crypto.randomUUID());
+                    formOutput.classList.remove('hidden');
+                    setLoading(false);
+                }
             }
 
-            function renderForm(topic, sessionId) {
+            function renderForm(topic, customQuestions, sessionId) {
                 const standardQuestions = [
                     { id: 'overall-satisfaction', text: '1. 整體而言，您對這次的分享會滿意度如何？' },
                     { id: 'content-relevance', text: '2. 分享會的內容對您的工作或學習是否有幫助？' },
@@ -257,6 +291,12 @@
                 ];
 
                 nextQuestionNumber = standardQuestions.length + 1;
+                manualQuestionCounter = 0; // Reset counter for each new form
+
+                const customQuestionsHtml = customQuestions.map(q => {
+                    const questionHtml = `<div class="mb-6"><label class="block text-md font-medium text-gray-700 mb-3">${nextQuestionNumber++}. ${q.question}</label><div class="flex items-center space-x-4"><input type="radio" id="ai-q-${nextQuestionNumber-1}-yes" name="ai-q-${nextQuestionNumber-1}" value="是" required><label for="ai-q-${nextQuestionNumber-1}-yes">是</label><input type="radio" id="ai-q-${nextQuestionNumber-1}-no" name="ai-q-${nextQuestionNumber-1}" value="否"><label for="ai-q-${nextQuestionNumber-1}-no">否</label><input type="radio" id="ai-q-${nextQuestionNumber-1}-neutral" name="ai-q-${nextQuestionNumber-1}" value="無意見"><label for="ai-q-${nextQuestionNumber-1}-neutral">無意見</label></div></div>`;
+                    return questionHtml;
+                }).join('');
 
                 formOutput.innerHTML = `
                     <div class="text-center mb-6"><h2 class="text-2xl font-bold">${topic}</h2><p class="text-md text-gray-600 mt-1">分享會回饋表單</p></div>
@@ -264,6 +304,7 @@
                         <div class="mb-6"><label for="submitter-name" class="block text-md font-medium mb-2">您的姓名：</label><input type="text" id="submitter-name" name="submitter-name" class="w-full px-4 py-2 border border-gray-300 rounded-lg" required></div>
                         <div class="mb-8"><label for="submitter-department" class="block text-md font-medium mb-2">您的部門：</label><input type="text" id="submitter-department" name="submitter-department" class="w-full px-4 py-2 border border-gray-300 rounded-lg" required></div>
                         ${standardQuestions.map(q => `<div class="mb-8"><label class="block text-md font-medium text-gray-700 mb-3">${q.text}</label><div class="star-rating flex flex-row-reverse justify-end">${[5,4,3,2,1].map(i => `<input type="radio" id="${q.id}-${i}" name="${q.id}" value="${i}" required><label for="${q.id}-${i}">★</label>`).join('')}</div></div>`).join('')}
+                        ${customQuestionsHtml}
                         <div id="editable-questions-container"></div>
                         <div class="mt-8 border-t pt-6"><label for="feedback-comments" class="block text-md font-medium mb-2">其他建議或回饋：</label><textarea id="feedback-comments" name="feedback-comments" rows="5" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></textarea></div>
                         <div id="form-editor-controls" class="mt-8 border-t pt-6 text-sm">
@@ -275,10 +316,9 @@
                             </div>
                             <div class="mt-4"><button type="button" id="publish-btn" class="w-full px-4 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700">發布並產生 QR Code</button></div>
                         </div>
-                        <div class="mt-8 text-center"><button type="submit" class="w-full sm:w-auto px-10 py-3 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700">提交回饋</button></div>
+                        <div class="mt-8 text-center hidden"><button type="submit" class="w-full sm:w-auto px-10 py-3 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700">提交回饋</button></div>
                     </form>`;
 
-                document.getElementById('feedback-form').addEventListener('submit', handleFormSubmit);
                 document.getElementById('add-star-btn').addEventListener('click', () => addQuestion('star'));
                 document.getElementById('add-yesno-btn').addEventListener('click', () => addQuestion('yesno'));
                 document.getElementById('add-text-btn').addEventListener('click', () => addQuestion('text'));
@@ -307,56 +347,30 @@
             }
 
             // --- Data Submission & Publishing ---
-            async function handleFormSubmit(e) {
-                e.preventDefault();
-                const form = e.target;
-                const formData = new FormData(form);
-                const responses = [];
-                responses.push({ question: "您的姓名：", answer: formData.get('submitter-name') });
-                responses.push({ question: "您的部門：", answer: formData.get('submitter-department') });
-                form.querySelectorAll('.star-rating').forEach(div => {
-                    const label = div.previousElementSibling;
-                    const answer = formData.get(div.querySelector('input').name);
-                    responses.push({ question: label.textContent, answer: answer ? `${answer}` : '' });
-                });
-                form.querySelectorAll('.manual-question').forEach(div => {
-                    const question = div.querySelector('.manual-question-input').value;
-                    let answer = '';
-                    if (div.dataset.type === 'text') {
-                        answer = div.querySelector('textarea').value;
-                    } else {
-                        const checkedRadio = div.querySelector('input[type="radio"]:checked');
-                        answer = checkedRadio ? checkedRadio.value : '';
-                    }
-                    if (question) responses.push({ question, answer });
-                });
-                responses.push({ question: "其他建議或回饋：", answer: formData.get('feedback-comments') });
-
-                const data = {
-                    sessionId: form.dataset.sessionId,
-                    sessionTopic: form.dataset.sessionTopic,
-                    submittedAt: serverTimestamp(),
-                    responses: responses
-                };
-                try {
-                    await addDoc(collection(db, `artifacts/${appId}/public/data/feedbackSubmissions`), data);
-                    showModal('提交成功！', '感謝您的寶貴回饋。');
-                    form.reset();
-                    formOutput.innerHTML = '';
-                    formOutput.classList.add('hidden');
-                } catch (error) {
-                    console.error("Error adding document: ", error);
-                    showModal('提交失敗', '無法儲存您的回饋。', true);
-                }
-            }
-
             async function handlePublishForm() {
                 const form = document.getElementById('feedback-form');
+                if (!form) return;
+
                 const questions = [];
+                // Add standard questions
                 questions.push({ type: 'name', text: '您的姓名：' });
                 questions.push({ type: 'department', text: '您的部門：' });
-                form.querySelectorAll('.star-rating').forEach(div => questions.push({ type: 'star', text: div.previousElementSibling.textContent }));
-                document.querySelectorAll('.manual-question').forEach(div => questions.push({ type: div.dataset.type, text: div.querySelector('.manual-question-input').value }));
+                form.querySelectorAll('.star-rating').forEach(div => {
+                    const label = div.previousElementSibling;
+                    if (label) questions.push({ type: 'star', text: label.textContent });
+                });
+                // Add AI-generated questions
+                form.querySelectorAll('label[for^="ai-q-"]').forEach(label => {
+                    if (label) questions.push({ type: 'yesno', text: label.textContent });
+                });
+                // Add manually-added questions
+                form.querySelectorAll('.manual-question').forEach(div => {
+                    const textInput = div.querySelector('.manual-question-input');
+                    if (textInput && textInput.value) {
+                         questions.push({ type: div.dataset.type, text: textInput.value });
+                    }
+                });
+                // Add final comment box
                 questions.push({ type: 'textarea', text: '其他建議或回饋：' });
 
                 const formStructure = {
@@ -370,14 +384,12 @@
                     showQrCodeModal(url);
                 } catch (error) {
                     console.error("Error publishing form: ", error);
-                    showModal('發布失敗', '無法儲存表單結構。', true);
+                    showModal('發布失敗', '無法儲存表單結構。請檢查您的 Firestore 安全規則。', true);
                 }
             }
             
             // --- Public Form Rendering ---
             async function loadAndRenderPublicForm(formId) {
-                // This function is outside the main app flow, so DOM elements are not available.
-                // It will replace the entire body content.
                 document.getElementById('login-view').classList.add('hidden');
                 document.getElementById('app-view').classList.add('hidden');
                 try {
@@ -396,14 +408,16 @@
                     const questionsHtml = data.questions.map((q, index) => {
                         const name = `q-${index}`;
                         const label = `<label class="block text-md font-medium text-gray-700 mb-2">${q.text}</label>`;
+                        const isRequired = q.type === 'name' || q.type === 'department' || q.type === 'star' || q.type === 'yesno';
+                        const requiredAttr = isRequired ? 'required' : '';
                         switch (q.type) {
                             case 'name':
                             case 'department':
-                                return `<div class="mb-6">${label}<input type="text" name="${name}" class="w-full px-4 py-2 border border-gray-300 rounded-lg" required></div>`;
+                                return `<div class="mb-6">${label}<input type="text" name="${name}" class="w-full px-4 py-2 border border-gray-300 rounded-lg" ${requiredAttr}></div>`;
                             case 'star':
-                                return `<div class="mb-8">${label}<div class="star-rating flex flex-row-reverse justify-end">${[5,4,3,2,1].map(i => `<input type="radio" id="${name}-${i}" name="${name}" value="${i}" required><label for="${name}-${i}">★</label>`).join('')}</div></div>`;
+                                return `<div class="mb-8">${label}<div class="star-rating flex flex-row-reverse justify-end">${[5,4,3,2,1].map(i => `<input type="radio" id="${name}-${i}" name="${name}" value="${i}" ${requiredAttr}><label for="${name}-${i}">★</label>`).join('')}</div></div>`;
                             case 'yesno':
-                                return `<div class="mb-6">${label}<div class="flex items-center space-x-4"><input type="radio" id="${name}-yes" name="${name}" value="是" required><label for="${name}-yes">是</label><input type="radio" id="${name}-no" name="${name}" value="否"><label for="${name}-no">否</label><input type="radio" id="${name}-neutral" name="${name}" value="無意見"><label for="${name}-neutral">無意見</label></div></div>`;
+                                return `<div class="mb-6">${label}<div class="flex items-center space-x-4"><input type="radio" id="${name}-yes" name="${name}" value="是" ${requiredAttr}><label for="${name}-yes">是</label><input type="radio" id="${name}-no" name="${name}" value="否"><label for="${name}-no">否</label><input type="radio" id="${name}-neutral" name="${name}" value="無意見"><label for="${name}-neutral">無意見</label></div></div>`;
                             case 'text':
                                 return `<div class="mb-6">${label}<textarea name="${name}" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></textarea></div>`;
                             case 'textarea':
@@ -435,12 +449,13 @@
                             await addDoc(collection(db, `artifacts/${appId}/public/data/feedbackSubmissions`), submissionData);
                             publicFormContainer.innerHTML = `<div class="bg-white p-10 rounded-2xl shadow-lg text-center"><h2 class="text-2xl font-bold text-green-600">提交成功！</h2><p class="mt-2 text-gray-600">感謝您的寶貴回饋。</p></div>`;
                         } catch (err) {
+                            console.error("Public form submission error:", err);
                             publicFormContainer.innerHTML = `<div class="bg-white p-10 rounded-2xl shadow-lg text-center"><h2 class="text-2xl font-bold text-red-600">提交失敗</h2><p class="mt-2 text-gray-600">抱歉，發生錯誤，請稍後再試。</p></div>`;
                         }
                     });
                 } catch (error) {
                     console.error("Error loading public form:", error);
-                    document.body.innerHTML = `<div class="text-center p-10"><h1 class="text-2xl font-bold text-red-600">載入錯誤</h1><p class="mt-2 text-gray-600">無法載入此回饋表單。</p></div>`;
+                    document.body.innerHTML = `<div class="text-center p-10"><h1 class="text-2xl font-bold text-red-600">載入錯誤</h1><p class="mt-2 text-gray-600">無法載入此回饋表單。請檢查 Firestore 安全規則。 </p></div>`;
                 }
             }
             
@@ -469,23 +484,23 @@
                     renderStats(sessions);
                 }, (error) => {
                     console.error("Error fetching stats:", error);
-                    statsContainer.innerHTML = '<p class="text-center text-red-500">讀取資料時發生錯誤。</p>';
+                    statsContainer.innerHTML = '<p class="text-center text-red-500">讀取資料時發生錯誤。請檢查 Firestore 安全規則。</p>';
                 });
             }
 
             function renderStats(sessions) {
                 statsContainer.innerHTML = '';
-                if (window.activeCharts) {
-                    window.activeCharts.forEach(chart => chart.destroy());
+                if (activeCharts) {
+                    activeCharts.forEach(chart => chart.destroy());
                 }
-                window.activeCharts = new Map();
+                activeCharts = new Map();
 
                 Object.values(sessions).forEach((sessionData) => {
                     const subCount = sessionData.submissions.length;
                     if (subCount === 0) return;
                     const card = document.createElement('div');
                     card.className = 'bg-white p-6 rounded-2xl shadow-lg mb-8';
-                    const cardId = sessionData.submissions[0].id;
+                    const cardId = sessionData.submissions[0].sessionId || crypto.randomUUID();
 
                     const standardQuestions = ['1. 整體而言，您對這次的分享會滿意度如何？', '2. 分享會的內容對您的工作或學習是否有幫助？', '3. 講者的表達是否清晰易懂？', '4. 您認為分享會的內容在實務上應用的可能性高嗎？'];
                     const ratingLabels = ['整體滿意度', '內容幫助', '表達清晰', '實務應用'];
@@ -494,7 +509,7 @@
                         const questionText = standardQuestions[index];
                         const counts = [0, 0, 0, 0, 0];
                         sessionData.submissions.forEach(sub => {
-                            const response = (sub.responses || []).find(r => r.question === questionText);
+                            const response = (sub.responses || []).find(r => r.question.trim() === questionText.trim());
                             const score = response ? parseInt(response.answer) : 0;
                             if (score >= 1 && score <= 5) counts[score - 1]++;
                         });
@@ -536,11 +551,11 @@
                     setTimeout(() => {
                        ratingLabels.forEach((label, index) => {
                             const ctx = document.getElementById(`chart-${cardId}-${index}`);
-                            if (!ctx) return;
+                            if (!ctx || activeCharts.has(ctx.id)) return;
                             const questionText = standardQuestions[index];
                             const counts = [0, 0, 0, 0, 0];
                             sessionData.submissions.forEach(sub => {
-                                 const response = (sub.responses || []).find(r => r.question === questionText);
+                                 const response = (sub.responses || []).find(r => r.question.trim() === questionText.trim());
                                  const score = response ? parseInt(response.answer) : 0;
                                  if (score >= 1 && score <= 5) counts[score - 1]++;
                             });
@@ -549,7 +564,7 @@
                                 data: { datasets: [{ data: counts, backgroundColor: CHART_COLORS, borderColor: '#ffffff', borderWidth: 2 }] },
                                 options: { cutout: '80%', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { enabled: false } } }
                             });
-                            window.activeCharts.set(ctx.id, chart);
+                            activeCharts.set(ctx.id, chart);
                         });
                     }, 0);
                 });
@@ -602,6 +617,30 @@
                 messageModal.classList.add('flex');
             }
 
+            // --- Gemini API Call ---
+            async function getCustomQuestions(topic, summary, fileContent) {
+                const prompt = `你是一個活動問卷設計專家。請根據以下 AI 分享會的資訊，設計 2 個最相關、最能評估學習成效的封閉式問題（是/否/無意見）。主題：${topic} 內容摘要：${summary} ${fileContent ? `補充文件內容：\n${fileContent.substring(0, 3000)}` : ''} 請確保問題簡潔明瞭，並以繁體中文回答。`;
+                const payload = {
+                    contents: [{ role: "user", parts: [{ text: prompt }] }],
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                        responseSchema: { type: "OBJECT", properties: { questions: { type: "ARRAY", items: { type: "OBJECT", properties: { question: { type: "STRING" } }, required: ["question"] }}}, required: ["questions"] }
+                    }
+                };
+                const apiKey = ""; // This is handled by the environment
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+                try {
+                    const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    if (!response.ok) throw new Error(`API request failed with status ${response.status}`);
+                    const result = await response.json();
+                    const jsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                    return JSON.parse(jsonText).questions || [];
+                } catch (error) {
+                    console.error("Gemini API call failed:", error);
+                    throw error;
+                }
+            }
+
             // --- Initial Load ---
             const urlParams = new URLSearchParams(window.location.search);
             const formId = urlParams.get('formId');
@@ -614,4 +653,3 @@
     </script>
 </body>
 </html>
-這是更新後的，還是沒反應
